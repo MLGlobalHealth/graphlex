@@ -187,27 +187,31 @@ def draw_graph_png(G, attr_name):
     fig, ax = plt.subplots(figsize=(5.2, 4.6))
     pos = nx.spring_layout(G, seed=42)  # fixed seed: same picture every run
 
+    # Light, colorblind-friendly palette (ColorBrewer "Paired" light members) so
+    # BLACK node labels stay readable. First two = light blue / light orange.
+    PALETTE = ["#a6cee3", "#fdbf6f", "#b2df8a", "#cab2d6", "#fb9a99",
+               "#ffff99", "#fccde5", "#ccebc5"]
     legend_handles = None
     if attr_name:
         vals = nx.get_node_attributes(G, attr_name)
         groups = sorted({str(v) for v in vals.values()})
-        cmap = plt.get_cmap("tab10")
-        color_of = {g: cmap(i % 10) for i, g in enumerate(groups)}
+        color_of = {g: PALETTE[i % len(PALETTE)] for i, g in enumerate(groups)}
         node_colors = [color_of[str(vals.get(node, "?"))] for node in G.nodes]
         legend_handles = [
             plt.Line2D([0], [0], marker="o", color="w", label=g,
-                       markerfacecolor=color_of[g], markersize=10)
+                       markerfacecolor=color_of[g], markeredgecolor="#555",
+                       markersize=10)
             for g in groups
         ]
     else:
-        node_colors = "#4c78a8"
+        node_colors = "#a6cee3"   # light blue
 
-    nx.draw_networkx_edges(G, pos, ax=ax, alpha=0.4, width=1.0)
+    nx.draw_networkx_edges(G, pos, ax=ax, alpha=0.45, width=1.0, edge_color="#888")
     nx.draw_networkx_nodes(G, pos, ax=ax, node_color=node_colors,
-                           node_size=420, linewidths=0.8, edgecolors="#333")
+                           node_size=440, linewidths=1.0, edgecolors="#555")
     # only label small graphs to keep the picture readable
     if G.number_of_nodes() <= 25:
-        nx.draw_networkx_labels(G, pos, ax=ax, font_size=8)
+        nx.draw_networkx_labels(G, pos, ax=ax, font_size=8, font_color="#000")
     if legend_handles:
         ax.legend(handles=legend_handles, title=attr_name, fontsize=8,
                   loc="best", framealpha=0.9)
@@ -395,8 +399,9 @@ PAGE = r"""<!doctype html>
     <div class="row">
       <div>
         <label for="example">Built-in example</label>
-        <select id="example">__OPTIONS__</select>
-        <p class="muted">Or paste your own graph below (used instead if non-empty).</p>
+        <select id="example" onchange="analyze()">__OPTIONS__</select>
+        <p class="muted">Or paste your own graph on the right (used instead of the
+           example if non-empty).</p>
       </div>
       <div>
         <label for="edges">Edge list (e.g. <code>0-1, 1-2, 2-0</code>)</label>
@@ -433,13 +438,13 @@ PAGE = r"""<!doctype html>
   <div id="askCard" class="card hidden">
     <h2>3. Ask the LLM</h2>
     <p class="muted">The LLM <b>only sees the verbalized facts</b>, never the raw
-       graph structure. The exact prompt is shown below for full transparency.</p>
+       graph structure. The prompt that will be sent is shown live below and updates
+       as you edit your question.</p>
     <label for="question">Question</label>
-    <input type="text" id="question">
+    <input type="text" id="question" oninput="updatePreview()">
     <button id="askBtn" class="ask" onclick="ask()">Ask the LLM</button>
     <div id="askOut" class="hidden">
-      <div class="ctxlabel">Exact prompt sent to the LLM
-        (verbalized facts + your question &mdash; no raw structure):</div>
+      <div class="ctxlabel" id="promptLabel"></div>
       <div id="prompt" class="prompt"></div>
       <div class="ctxlabel" id="answerLabel">LLM answer:</div>
       <div id="answer" class="answer"></div>
@@ -449,6 +454,22 @@ PAGE = r"""<!doctype html>
 
 <script>
 let lastVerbalization = "";
+const PREVIEW_LABEL = "Prompt preview — this exact text is sent when you click “Ask the LLM” (verbalized facts + your question; no raw structure):";
+const SENT_LABEL = "✓ Exact prompt sent to the LLM (verbalized facts + your question; no raw structure):";
+
+// Mirrors the server-side prompt built in /ask EXACTLY — keep in sync.
+function buildPrompt(verb, q) {
+  return "You are analyzing a graph. Here is a factual, deterministically-computed " +
+    "description of its structure (you do NOT have the raw graph, only this " +
+    "verbalized summary):\n\n" + verb + "\n\nQuestion: " + (q || "") + "\n\n" +
+    "Answer concisely, citing the specific numbers above that justify your reasoning.";
+}
+function updatePreview() {
+  if (!lastVerbalization) return;
+  document.getElementById('prompt').textContent =
+    buildPrompt(lastVerbalization, document.getElementById('question').value);
+  document.getElementById('promptLabel').textContent = PREVIEW_LABEL;
+}
 
 // Minimal, safe markdown for LLM answers: escape HTML first, then render
 // **bold**, *italic*, and `code`. Newlines are preserved by CSS pre-wrap.
@@ -481,7 +502,11 @@ async function analyze() {
     document.getElementById('question').value = d.default_question;
     document.getElementById('analyzeCard').classList.remove('hidden');
     document.getElementById('askCard').classList.remove('hidden');
-    document.getElementById('askOut').classList.add('hidden');
+    // show the live prompt preview immediately; clear any prior answer
+    document.getElementById('askOut').classList.remove('hidden');
+    updatePreview();
+    document.getElementById('answerLabel').textContent = 'LLM answer (click “Ask the LLM”):';
+    document.getElementById('answer').textContent = '';
   } catch (e) {
     alert('Request failed: ' + e);
   } finally {
@@ -493,7 +518,8 @@ async function ask() {
   const btn = document.getElementById('askBtn');
   btn.disabled = true; btn.textContent = 'Asking the LLM…';
   document.getElementById('askOut').classList.remove('hidden');
-  document.getElementById('prompt').textContent = '(building prompt…)';
+  updatePreview();
+  document.getElementById('answerLabel').textContent = 'LLM answer:';
   document.getElementById('answer').textContent = '…';
   try {
     const body = { verbalization: lastVerbalization,
@@ -502,6 +528,7 @@ async function ask() {
                                    body: JSON.stringify(body)});
     const d = await r.json();
     document.getElementById('prompt').textContent = d.prompt || '(none)';
+    document.getElementById('promptLabel').textContent = SENT_LABEL;
     document.getElementById('answerLabel').textContent =
         'LLM answer  —  backend: ' + (d.backend || 'unknown');
     document.getElementById('answer').innerHTML = mdLite(d.answer || '(empty)');
@@ -511,6 +538,9 @@ async function ask() {
     btn.disabled = false; btn.textContent = 'Ask the LLM';
   }
 }
+
+// Show the default example's graph immediately on page load (no click needed).
+window.addEventListener('DOMContentLoaded', analyze);
 </script>
 </body>
 </html>
