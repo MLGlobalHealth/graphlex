@@ -325,7 +325,7 @@ def run_llm(prompt):
 # =============================================================================
 # HTML (single inline template, no JS framework — just fetch()).
 # =============================================================================
-PAGE = """<!doctype html>
+PAGE = r"""<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
