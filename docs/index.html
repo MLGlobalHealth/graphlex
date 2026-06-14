@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>graphlex — turn a graph into LLM-ready language (in your browser)</title>
+<style>
+  :root { --ink:#1a202c; --muted:#718096; --line:#e2e8f0; --accent:#2b6cb0; }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+         color: var(--ink); margin: 0; background: #f7fafc; line-height: 1.5; }
+  header { background: #fff; border-bottom: 1px solid var(--line); padding: 18px 22px; }
+  h1 { margin: 0 0 4px; font-size: 21px; }
+  .pipe { font-size: 13px; color: var(--muted); }
+  .pipe b { color: var(--ink); }
+  main { max-width: 1000px; margin: 18px auto; padding: 0 16px; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 12px;
+          padding: 16px 18px; margin-bottom: 16px; }
+  h2 { font-size: 15px; margin: 0 0 12px; }
+  label { display:block; font-size: 12px; font-weight: 600; margin: 8px 0 3px; color:#4a5568; }
+  select, input[type=text], textarea { width: 100%; padding: 7px 9px; font-size: 13px;
+          border: 1px solid #cbd5e0; border-radius: 7px; font-family: inherit; }
+  textarea { resize: vertical; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .results { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+  button { margin-top: 12px; padding: 9px 16px; font-size: 14px; font-weight: 600;
+           border: none; border-radius: 8px; background: var(--accent); color: #fff; cursor: pointer; }
+  button:disabled { opacity: .55; cursor: default; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .badge { display:inline-block; font-size:11px; font-weight:700; border-radius:6px;
+           padding:2px 8px; margin-bottom:8px; }
+  .det { background:#f0fff4; color:#276749; border:1px solid #c6f6d5; }
+  .nx  { background:#ebf8ff; color:#2b6cb0; border:1px solid #bee3f8; }
+  .verb { white-space: pre-wrap; background:#fff; border:1px solid var(--line);
+          border-radius:8px; padding:12px; font-size:13px; }
+  .ctxlabel { font-size:12px; font-weight:700; color:#dd6b20; margin:14px 0 4px; }
+  .promptwrap { position: relative; }
+  .prompt { white-space: pre-wrap; background:#fffaf0; border:1px solid #feebc8;
+            border-radius:8px; padding:12px; padding-top:34px; font-size:13px; }
+  .copybtn { position:absolute; top:6px; right:6px; font-size:12px; cursor:pointer;
+             background:#fff; color:#c05621; border:1px solid #feb2a8; border-radius:6px;
+             padding:3px 9px; margin:0; }
+  .openrow a { display:inline-block; margin:10px 10px 0 0; font-size:13px; font-weight:600;
+               color:var(--accent); text-decoration:none; border:1px solid #bee3f8;
+               border-radius:7px; padding:6px 12px; background:#ebf8ff; }
+  details { margin-top:10px; } summary { cursor:pointer; font-size:12px; color:var(--muted); }
+  pre { white-space: pre-wrap; font-size: 12px; background:#f7fafc; border:1px solid var(--line);
+        border-radius:8px; padding:10px; }
+  svg { width: 100%; height: auto; border:1px solid var(--line); border-radius:8px; background:#fff; }
+  #status { font-size: 13px; color: var(--muted); }
+  .hidden { display: none; }
+  @media (max-width: 760px) { .row, .results { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>graphlex &mdash; turn a network into LLM-ready language</h1>
+  <div class="pipe"><b>NetworkX</b> &rarr; <b>graphlex.facts()</b> (exact numbers) &rarr;
+     <b>graphlex.verbalize()</b> (thresholds &rarr; prose) &rarr; copy into <b>ChatGPT / Claude</b>.
+     Runs entirely in your browser (Pyodide) &mdash; no server, no data leaves your machine.</div>
+</header>
+
+<main>
+  <div class="card"><div id="status">Loading graphlex in your browser (Pyodide + NetworkX, ~10&ndash;15s the first time)&hellip;</div></div>
+
+  <div id="app" class="hidden">
+    <div class="card">
+      <h2>1. Choose or paste a graph</h2>
+      <div class="row">
+        <div>
+          <label for="example">Built-in example</label>
+          <select id="example">
+            <option value="office">Office collaboration (dept + seniority)</option>
+            <option value="er">Random (Erdős–Rényi)</option>
+            <option value="ba">Scale-free (Barabási–Albert)</option>
+            <option value="ws">Small-world (Watts–Strogatz)</option>
+            <option value="molecule">Molecule (benzene + nitro group)</option>
+          </select>
+          <p class="muted">Or paste your own on the right (used instead of the example if non-empty).</p>
+        </div>
+        <div>
+          <label for="edges">Edge list (e.g. <code>0-1, 1-2, 2-0</code>)</label>
+          <textarea id="edges" rows="3" placeholder="0-1, 1-2, 2-0, 2-3"></textarea>
+          <label for="attrs">Optional node attributes (e.g. <code>0:A, 1:A, 2:B</code>)</label>
+          <textarea id="attrs" rows="2" placeholder="0:A, 1:A, 2:B, 3:B"></textarea>
+        </div>
+      </div>
+      <label for="question">Question for the LLM</label>
+      <input type="text" id="question" value="Is this network random, scale-free, or small-world, and why?">
+      <button id="go" onclick="run()">Build the verbalization &amp; prompt</button>
+    </div>
+
+    <div id="out" class="card hidden">
+      <h2>2. Deterministic analysis (no LLM)</h2>
+      <div class="results">
+        <div>
+          <div class="badge nx">NetworkX spring layout</div>
+          <svg id="graph" viewBox="0 0 400 360" preserveAspectRatio="xMidYMid meet"></svg>
+        </div>
+        <div>
+          <div class="badge det">Computed by NetworkX + graphlex &mdash; deterministic, no LLM</div>
+          <div id="verb" class="verb"></div>
+          <details><summary>Show raw facts() structure (JSON)</summary><pre id="facts"></pre></details>
+        </div>
+      </div>
+      <div class="ctxlabel" id="promptLabel"></div>
+      <div class="promptwrap">
+        <button class="copybtn" onclick="copyPrompt(this)">Copy</button>
+        <div id="prompt" class="prompt"></div>
+      </div>
+      <div class="openrow">
+        <span class="muted">Then paste it into:</span>
+        <a href="https://chatgpt.com/" target="_blank" rel="noopener">Open ChatGPT ↗</a>
+        <a href="https://claude.ai/new" target="_blank" rel="noopener">Open Claude ↗</a>
+        <a href="https://gemini.google.com/app" target="_blank" rel="noopener">Open Gemini ↗</a>
+      </div>
+      <p class="muted">The model only ever sees the verbalized facts above &mdash; never the raw graph.
+         That is the whole point: NetworkX computes the structure exactly; the LLM just reasons over it.</p>
+    </div>
+  </div>
+</main>
+
+<!-- The EXACT Python that runs in-browser (graphlex from the wheel). Non-executed
+     script tag so backslashes/newlines survive verbatim. -->
+<script type="text/python" id="pycode">
+import json, networkx as nx
+from graphlex import facts, verbalize
+
+def _office():
+    people = {"Alice":("Eng","snr"),"Bob":("Eng","jr"),"Carol":("Eng","jr"),"Dan":("Eng","jr"),
+              "Eve":("Eng","snr"),"Frank":("Sales","snr"),"Grace":("Sales","jr"),"Hank":("Sales","jr"),
+              "Iris":("Sales","jr"),"Jack":("Sales","snr")}
+    E=[("Alice","Bob"),("Alice","Carol"),("Alice","Dan"),("Bob","Carol"),("Carol","Dan"),
+       ("Dan","Eve"),("Bob","Eve"),("Frank","Grace"),("Frank","Hank"),("Grace","Iris"),
+       ("Hank","Jack"),("Iris","Jack"),("Grace","Jack"),("Alice","Frank")]
+    G=nx.Graph()
+    for p,(d,s) in people.items(): G.add_node(p,dept=d,sen=s)
+    G.add_edges_from(E)
+    return G,"dept"
+
+def _molecule():
+    G=nx.cycle_graph(6)
+    for i in range(6): G.nodes[i]["atom"]="Carbon"
+    G.add_edge(0,6); G.nodes[6]["atom"]="Nitrogen"
+    G.add_edge(6,7); G.nodes[7]["atom"]="Oxygen"
+    G.add_edge(6,8); G.nodes[8]["atom"]="Oxygen"
+    return G,"atom"
+
+def _gen(kind):
+    if kind=="er": return nx.erdos_renyi_graph(24,0.18,seed=7),None
+    if kind=="ba": return nx.barabasi_albert_graph(24,2,seed=7),None
+    return nx.watts_strogatz_graph(24,4,0.2,seed=7),None
+
+def _from_text(edges_text, attrs_text):
+    G=nx.Graph()
+    for tok in edges_text.replace(";",",").split(","):
+        tok=tok.strip()
+        if not tok: continue
+        if "-" in tok:
+            a,b=tok.split("-",1); G.add_edge(a.strip(),b.strip())
+        else:
+            G.add_node(tok)
+    attr=None
+    if attrs_text.strip():
+        attr="group"
+        for tok in attrs_text.replace(";",",").split(","):
+            if ":" in tok:
+                n,v=tok.split(":",1); n=n.strip()
+                if n in G: G.nodes[n][attr]=v.strip()
+        if not nx.get_node_attributes(G,attr): attr=None
+    return G,attr
+
+def analyze(example, edges_text, attrs_text, question):
+    if edges_text.strip(): G,attr=_from_text(edges_text,attrs_text)
+    elif example=="office": G,attr=_office()
+    elif example=="molecule": G,attr=_molecule()
+    else: G,attr=_gen(example)
+    if G.number_of_nodes()==0: return json.dumps({"error":"Empty graph — check your edge list."})
+    na=[attr] if attr else None
+    f=facts(G,node_attrs=na)
+    verb=verbalize(f,focus="all")
+    pos=nx.spring_layout(G,seed=42)
+    nodes=[{"id":str(n),"x":float(pos[n][0]),"y":float(pos[n][1]),
+            "g":(str(G.nodes[n].get(attr)) if attr else None)} for n in G]
+    edges=[{"s":str(u),"t":str(v)} for u,v in G.edges()]
+    groups=sorted({str(G.nodes[n].get(attr)) for n in G}) if attr else []
+    prompt=("You are analyzing a graph. Here is a factual, deterministically-computed "
+            "description of its structure (you do NOT have the raw graph, only this "
+            "verbalized summary):\n\n"+verb+"\n\nQuestion: "+(question or "")+"\n\n"
+            "Answer concisely, citing the specific numbers above that justify your reasoning.")
+    return json.dumps({"verbalization":verb,"prompt":prompt,"nodes":nodes,"edges":edges,
+                       "groups":groups,"attr":attr,
+                       "facts_json":json.dumps({k:v for k,v in f["structure"].items()},indent=2)})
+</script>
+
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+<script>
+const PALETTE = ["#a6cee3","#fdbf6f","#b2df8a","#cab2d6","#fb9a99","#ffff99","#fccde5","#ccebc5"];
+let pyodide = null, analyzeFn = null;
+
+async function boot() {
+  try {
+    pyodide = await loadPyodide();
+    document.getElementById('status').textContent = "Loading NetworkX + graphlex…";
+    await pyodide.loadPackage("micropip");
+    const micropip = pyodide.pyimport("micropip");
+    const wheel = new URL("graphlex-0.0.1-py3-none-any.whl", window.location.href).href;
+    await micropip.install(["networkx", wheel]);   // pulls numpy automatically
+    pyodide.runPython(document.getElementById('pycode').textContent);
+    analyzeFn = pyodide.globals.get("analyze");
+    document.querySelector('#app').classList.remove('hidden');
+    document.querySelector('.card #status').closest('.card').classList.add('hidden');
+    run();  // show the default example immediately
+  } catch (e) {
+    document.getElementById('status').textContent = "Failed to load: " + e;
+  }
+}
+
+function run() {
+  if (!analyzeFn) return;
+  const btn = document.getElementById('go');
+  btn.disabled = true; btn.textContent = "Computing…";
+  try {
+    const res = analyzeFn(
+      document.getElementById('example').value,
+      document.getElementById('edges').value,
+      document.getElementById('attrs').value,
+      document.getElementById('question').value);
+    const d = JSON.parse(res);
+    if (d.error) { alert(d.error); return; }
+    document.getElementById('out').classList.remove('hidden');
+    document.getElementById('verb').textContent = d.verbalization;
+    document.getElementById('facts').textContent = d.facts_json;
+    document.getElementById('prompt').textContent = d.prompt;
+    document.getElementById('promptLabel').textContent =
+      "Prompt to copy (verbalized facts + your question; no raw structure) — paste into any chatbot:";
+    drawGraph(d);
+  } catch (e) {
+    alert("Error: " + e);
+  } finally {
+    btn.disabled = false; btn.textContent = "Build the verbalization & prompt";
+  }
+}
+
+function drawGraph(d) {
+  const W = 400, H = 360, pad = 28;
+  const xs = d.nodes.map(n => n.x), ys = d.nodes.map(n => n.y);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const sx = v => pad + (x1 > x0 ? (v - x0) / (x1 - x0) : .5) * (W - 2*pad);
+  const sy = v => pad + (y1 > y0 ? (v - y0) / (y1 - y0) : .5) * (H - 2*pad);
+  const colorOf = {}; (d.groups || []).forEach((g, i) => colorOf[g] = PALETTE[i % PALETTE.length]);
+  const fill = n => n.g != null ? colorOf[n.g] : "#a6cee3";
+  const P = {}; d.nodes.forEach(n => P[n.id] = n);
+  let s = "";
+  d.edges.forEach(e => {
+    const a = P[e.s], b = P[e.t]; if (!a || !b) return;
+    s += `<line x1="${sx(a.x)}" y1="${sy(a.y)}" x2="${sx(b.x)}" y2="${sy(b.y)}" stroke="#bbb" stroke-width="1"/>`;
+  });
+  const label = d.nodes.length <= 25;
+  d.nodes.forEach(n => {
+    s += `<circle cx="${sx(n.x)}" cy="${sy(n.y)}" r="11" fill="${fill(n)}" stroke="#555" stroke-width="1"/>`;
+    if (label) s += `<text x="${sx(n.x)}" y="${sy(n.y)+3}" font-size="8" text-anchor="middle" fill="#000">${esc(n.id)}</text>`;
+  });
+  if (d.groups && d.groups.length) {
+    d.groups.forEach((g, i) => {
+      const yy = 16 + i*18;
+      s += `<circle cx="14" cy="${yy}" r="7" fill="${colorOf[g]}" stroke="#555"/>`;
+      s += `<text x="26" y="${yy+3}" font-size="11" fill="#1a202c">${esc(g)}</text>`;
+    });
+  }
+  document.getElementById('graph').innerHTML = s;
+}
+function esc(t){ return String(t).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+function copyPrompt(btn) {
+  const txt = document.getElementById('prompt').textContent;
+  const done = () => { btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = 'Copy', 1200); };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(txt).then(done).catch(() => fb(txt, done));
+  } else fb(txt, done);
+}
+function fb(txt, done) {
+  const ta = document.createElement('textarea'); ta.value = txt;
+  ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); done(); } catch(e){} document.body.removeChild(ta);
+}
+
+boot();
+</script>
+</body>
+</html>
