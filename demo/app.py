@@ -21,6 +21,7 @@ import base64
 import io
 import json
 import os
+import shutil
 import subprocess
 import sys
 
@@ -270,19 +271,43 @@ def ask_qwen(prompt):
     return resp.strip(), f"Qwen via {QWEN_HOST} ({QWEN_MODEL})"
 
 
+CLAUDE_CLI = os.environ.get("CLAUDE_CLI", "claude")
+
+
+def ask_claude_cli(prompt):
+    """Use the installed Claude Code CLI in headless print mode (`claude -p`).
+    No API key needed — uses the existing Claude Code auth. The frontier model,
+    so the best demo backend when available."""
+    p = subprocess.run(
+        [CLAUDE_CLI, "-p", prompt],
+        capture_output=True, text=True, timeout=300,
+    )
+    if p.returncode != 0:
+        raise RuntimeError(f"claude -p rc={p.returncode}: {p.stderr[:300]}")
+    return p.stdout.strip(), "Claude Code CLI (claude -p)"
+
+
 def run_llm(prompt):
-    """Pick a backend by availability. Returns (answer, backend_label, is_live)."""
+    """Pick a backend by availability. Returns (answer, backend_label, is_live).
+    Preference: Claude Code CLI (`claude -p`, no key) -> Claude API (if key) ->
+    Qwen on clpc35 -> copy-paste. Set GRAPHLEX_NO_CLAUDE_CLI=1 to skip the CLI."""
+    errs = []
+
+    if not os.environ.get("GRAPHLEX_NO_CLAUDE_CLI") and shutil.which(CLAUDE_CLI):
+        try:
+            ans, label = ask_claude_cli(prompt)
+            if ans:
+                return ans, label, True
+            raise RuntimeError("empty response")
+        except Exception as e:
+            errs.append(f"claude-cli: {str(e)[:160]}")
+
     if os.environ.get("ANTHROPIC_API_KEY"):
         try:
             ans, label = ask_claude(prompt)
             return ans, label, True
         except Exception as e:
-            # fall through to Qwen if the Claude path fails for any reason
-            claude_err = str(e)[:200]
-        else:
-            claude_err = None
-    else:
-        claude_err = None
+            errs.append(f"claude-api: {str(e)[:160]}")
 
     try:
         ans, label = ask_qwen(prompt)
@@ -290,12 +315,11 @@ def run_llm(prompt):
             return ans, label, True
         raise RuntimeError("empty response")
     except Exception as e:
-        note = ("No live LLM reachable — copy the prompt above into your own LLM. "
-                f"(Qwen error: {str(e)[:200]}")
-        if claude_err:
-            note += f"; Claude error: {claude_err}"
-        note += ")"
-        return note, "none (no backend reachable)", False
+        errs.append(f"qwen: {str(e)[:160]}")
+
+    note = ("No live LLM reachable — copy the prompt above into your own LLM. ("
+            + "; ".join(errs) + ")")
+    return note, "none (no backend reachable)", False
 
 
 # =============================================================================
@@ -426,6 +450,17 @@ PAGE = """<!doctype html>
 <script>
 let lastVerbalization = "";
 
+// Minimal, safe markdown for LLM answers: escape HTML first, then render
+// **bold**, *italic*, and `code`. Newlines are preserved by CSS pre-wrap.
+function mdLite(s) {
+  s = String(s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  s = s.replace(/\*\*([^*]+?)\*\*/g, '<strong>$1</strong>');
+  s = s.replace(/(^|[^*])\*([^*\n]+?)\*(?!\*)/g, '$1<em>$2</em>');
+  s = s.replace(/`([^`]+?)`/g, '<code>$1</code>');
+  return s;
+}
+
 async function analyze() {
   const btn = document.getElementById('analyzeBtn');
   btn.disabled = true; btn.textContent = 'Analyzing…';
@@ -469,7 +504,7 @@ async function ask() {
     document.getElementById('prompt').textContent = d.prompt || '(none)';
     document.getElementById('answerLabel').textContent =
         'LLM answer  —  backend: ' + (d.backend || 'unknown');
-    document.getElementById('answer').textContent = d.answer || '(empty)';
+    document.getElementById('answer').innerHTML = mdLite(d.answer || '(empty)');
   } catch (e) {
     document.getElementById('answer').textContent = 'Request failed: ' + e;
   } finally {
@@ -551,11 +586,18 @@ def ask():
 
 
 if __name__ == "__main__":
-    url = "http://127.0.0.1:5000"
+    # Port is configurable via PORT (default 5000). On macOS, port 5000 is taken
+    # by the AirPlay Receiver (ControlCenter), so set e.g. PORT=5001 there.
+    port = int(os.environ.get("PORT", "5000"))
+    url = f"http://127.0.0.1:{port}"
     print("=" * 60)
     print("  graphlex demo running at:  " + url)
-    print("  LLM backend: " +
-          ("Claude API" if os.environ.get("ANTHROPIC_API_KEY")
-           else f"Qwen via {QWEN_HOST} ({QWEN_MODEL})"))
+    if not os.environ.get("GRAPHLEX_NO_CLAUDE_CLI") and shutil.which(CLAUDE_CLI):
+        _backend = "Claude Code CLI (claude -p)"
+    elif os.environ.get("ANTHROPIC_API_KEY"):
+        _backend = "Claude API"
+    else:
+        _backend = f"Qwen via {QWEN_HOST} ({QWEN_MODEL})"
+    print("  LLM backend: " + _backend)
     print("=" * 60, flush=True)
-    app.run(host="127.0.0.1", port=5000, debug=False)
+    app.run(host="127.0.0.1", port=port, debug=False)
