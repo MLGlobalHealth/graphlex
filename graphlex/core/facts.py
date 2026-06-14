@@ -48,6 +48,24 @@ def _path_stats(G, n):
     return float(nx.average_shortest_path_length(Gc)), int(nx.diameter(Gc))
 
 
+def _ring_sizes(G, n, m):
+    """Histogram of ring sizes from a minimum cycle basis (the 'rings' a chemist
+    sees). Exact for small graphs; skipped (None) above caps to stay cheap. No LLM."""
+    if n < 3 or m < n:                      # acyclic or trivially small
+        return {} if m >= n and n >= 3 else {}
+    if n > 400 or m > 1200:
+        return None
+    try:
+        basis = nx.minimum_cycle_basis(G)
+    except Exception:
+        return None
+    h = {}
+    for cyc in basis:
+        s = len(cyc)
+        h[s] = h.get(s, 0) + 1
+    return dict(sorted(h.items()))
+
+
 def facts(G, node_attrs=None):
     node_attrs = list(node_attrs or [])
     n, m = G.number_of_nodes(), G.number_of_edges()
@@ -63,6 +81,8 @@ def facts(G, node_attrs=None):
     if assort != assort:  # NaN -> not informative; keep as nan, rendered "undefined"
         pass
     apl, diam = _path_stats(G, n)
+    n_cycles = m - n + nx.number_connected_components(G) if n else 0   # cyclomatic number
+    ring_sizes = _ring_sizes(G, n, m)
 
     out = {
         "structure": {
@@ -79,6 +99,8 @@ def facts(G, node_attrs=None):
             "degree_assortativity": assort,
             "avg_path_length": apl,   # largest component; None if too large
             "diameter": diam,         # largest component; None if too large
+            "n_cycles": n_cycles,     # cyclomatic number (independent cycles)
+            "ring_sizes": ring_sizes, # {size: count} from min cycle basis; None if too large
             "n_communities": len(comms),
         },
         "attributes": {},
@@ -97,12 +119,24 @@ def facts(G, node_attrs=None):
             assort = float(nx.attribute_assortativity_coefficient(G, attr))
         except Exception:
             assort = float("nan")
+        # typed-edge ("bond") composition: distribution of unordered endpoint-value
+        # pairs over edges where both endpoints carry the attribute (the wiring, not
+        # just the node mix). e.g. for atoms: C-C, C-O, N-O, ...
+        et_counts = Counter()
+        for u, v in G.edges:
+            if u in vals and v in vals:
+                a, b = sorted((str(vals[u]), str(vals[v])))
+                et_counts[f"{a}-{b}"] += 1
+        et_total = sum(et_counts.values())
+        edge_type_composition = ({k: c / et_total for k, c in et_counts.items()}
+                                 if et_total else {})
         cross_edges = [(u, v) for u, v in G.edges if vals.get(u) != vals.get(v)]
         by_group = {g: [bc[v] for v in G if str(vals.get(v)) == g] for g in groups}
         mean_bc = {g: (float(np.mean(by_group[g])) if by_group[g] else 0.0) for g in groups}
         out["attributes"][attr] = {
             "groups": groups,
             "composition": composition,
+            "edge_type_composition": edge_type_composition,
             "assortativity": assort,
             "within_edges": m - len(cross_edges),
             "cross_edges": len(cross_edges),

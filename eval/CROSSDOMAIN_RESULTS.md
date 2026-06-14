@@ -155,3 +155,24 @@ reinforces that **the real attribute lever is typed *substructure*, not naming**
 Both LLM arms still sit at/below classical (0.867) — consistent with the main
 finding. Revisit with more seeds + a substructure-aware verbalization before
 concluding.
+
+### Follow-up — substructure verbalization (rings + typed "bond" composition)
+Added deterministic ring stats (cyclomatic number + ring-size histogram from a
+minimum cycle basis) and typed-edge ("bond") composition (distribution of
+endpoint-atom-type pairs, e.g. "Nitrogen-Oxygen 18%") to `facts()`/`verbalize()`.
+This gives the LLM the *wiring* (aromatic rings, nitro N-O bonds) mutagenicity
+actually depends on, not just the atom mix. MUTAG, same protocol:
+
+| arm | composition-only | + rings + bonds |
+|---|---|---|
+| graphlex+LLM opaque | 0.833 | 0.808 |
+| graphlex+LLM elem (real names) | 0.725 | **0.792** |
+| classical (facts+composition) | 0.867 | 0.867 |
+
+**Substructure is the lever — confirmed.** Adding rings+bonds lifted the *named*
+arm 0.725→0.792 and closed the elem-vs-opaque gap (−0.108 → −0.016): the named
+elements only become useful once the model is also told the bonding pattern it can
+apply chemistry to. But it did **not** push graphlex+LLM above classical (0.867) —
+consistent with the main finding that classical+logreg wins supervised molecular
+classification. (n=3, within noise.) The rings/bonds features are general
+NetworkX (now in the toolkit), so other domains get them too.

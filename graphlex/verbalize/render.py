@@ -33,6 +33,15 @@ def _structure(f):
     if s.get("avg_path_length") is not None:
         out += (f"Largest component: average path length {s['avg_path_length']:.2f}, "
                 f"diameter {s['diameter']}. ")
+    if "n_cycles" in s:
+        rs = s.get("ring_sizes")
+        if rs:
+            ringstr = ", ".join(f"{sz}-rings x{c}" for sz, c in rs.items())
+            out += f"{s['n_cycles']} independent cycles ({ringstr}). "
+        elif rs == {}:
+            out += f"{s['n_cycles']} independent cycles (acyclic or no small rings). "
+        else:
+            out += f"{s['n_cycles']} independent cycles. "
     out += (f"{s['n_communities']} communit{'y' if s['n_communities']==1 else 'ies'} "
             f"detected.")
     return out
@@ -53,6 +62,10 @@ def _attribute(f, attr, a):
     sent = []
     if a.get("composition"):
         sent.append(_composition_phrase(a["composition"], attr))
+    if a.get("edge_type_composition"):
+        items = sorted(a["edge_type_composition"].items(), key=lambda kv: (-kv[1], kv[0]))[:8]
+        bonds = ", ".join(f"{k} {p*100:.0f}%" for k, p in items)
+        sent.append(f"Edges by {attr}-pair: {bonds}.")
     sent.append(f"Ties are {homophily_word(a['assortativity'])} on {attr} "
                 f"(assortativity {a['assortativity']:.2f}).")
 

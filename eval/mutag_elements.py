@@ -26,7 +26,7 @@ import sys
 sys.path.insert(0, '/home/scratch/Dropbox/Seth/Research/MLGHrepos/graphlex')
 from graphlex import facts, verbalize
 
-OUT = '/home/scratch/bench_out/mutag_elem'
+OUT = '/home/scratch/bench_out/mutag_elem2'
 SEEDS = [11, 22, 33]
 SHOTS_PER_CLASS = 10
 N_QUERY = 40

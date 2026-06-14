@@ -29,7 +29,7 @@ from graphlex import facts, verbalize
 
 TU_ROOT = '/home/scratch/tudata'
 EMB_DIR = '/home/scratch/real_fm_embeddings'
-OUT = '/home/scratch/bench_out/crossdom_v2'   # v2: node features given to LLM + classical
+OUT = '/home/scratch/bench_out/crossdom_v3'   # v3: + rings + typed-edge (bond) composition
 SEEDS = [11, 22, 33]
 SHOTS_PER_CLASS = 12
 N_QUERY = 40
