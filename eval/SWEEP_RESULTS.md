@@ -96,34 +96,43 @@ classes → skipped; COIL-DEL 100-class and REDDIT-MULTI-5K also skipped.) DBLP'
 41k-dim bag-of-words features exceed the composition cap → structure-only. Opus now
 covers all 30 (seed 11; + seeds 22/33 on 6 domain reps). Balanced accuracy:
 
-| model | n | mean regret | within 0.05 | beats classical | subst. worse (>0.10) |
-|---|---|---|---|---|---|
-| **Opus** | 30 | **−0.009** | 22/30 | 15/30 | 3/30: DBLP_v1, NCI1, Fingerprint |
-| Qwen-32B-q4 | 27 | +0.021 | 16/27 | 12/27 | 6/27 |
-| Qwen-14B | 21 | −0.000 | 17/21 | 13/21 | 3/21 |
+### FINAL — full 3-seed Opus on all 30 (the publishable aggregate)
+| model | n | seeds | mean regret | worst | within 0.05 | beats classical | subst. worse (>0.10) |
+|---|---|---|---|---|---|---|---|
+| **Opus** | 30 | 3 | **−0.016** (ahead) | **+0.099** | **25/30** | 18/30 | **0/30** |
+| Qwen-14B | 21 | 3 | −0.000 | +0.144 | 17/21 | 13/21 | 3/21 |
+| Qwen-32B-q4 | 27 | 3 | +0.021 | +0.182 | 16/27 | 12/27 | 6/27 |
 
-(Final balanced-accuracy aggregates, all arms complete. Qwen-32B-q4 is *slightly
-worse* than 14B on flexibility here — quantized 32B ≈/below 14B on arbitrary-label
-graph classification, so model scale is not a lever on this task family, unlike the
-network-science capability ladder. Opus is the only arm ahead of the baseline on
-average and the only one substantially-worse on ≤3 datasets.)
+**With full multi-seed, Opus is NEVER substantially worse (0/30), ahead of the best
+classical baseline on average (−0.016), within 0.05 on 25/30, and wins outright on
+18/30 — across 8 sciences.** This is the clean, robust flexibility result.
 
-**Holds across 8 sciences:** under balanced accuracy Opus is still *ahead on average*
-(−0.009) and within 0.05 on 22/30. New wins include MSRC_9 0.854, SYNTHETICnew 0.659,
-PROTEINS 0.736. **New honest failures:** **DBLP_v1 (citation): Opus 0.343 vs classical
-0.664 — a real, large miss** (structure-only citation ego-graphs; the LLM does worse
-than chance while logreg finds structural signal); also NCI1 and Fingerprint persist.
-**Qwen-32B-q4 is not better than 14B here** — on these low-label classification tasks
-the quantized 32B ≈ 14B (the clean capability ladder was on family/network-science,
-not on arbitrary-label graph classification). Qwen-32B did fix the 14B format
-failures (KKI/OHSU/ENZYMES now score). MSRC_21 still rambles for both Qwen sizes
-(20-class prompt).
+> **Critical lesson: single-seed Opus was misleadingly pessimistic.** The "3
+> failures" reported at 1 seed were ALL artifacts of which graphs landed in the tiny
+> 5-shot set: DBLP_v1 0.343→**0.604**, NCI1 0.372→**0.569** (now *beats* classical),
+> Fingerprint 0.047→**0.127**. Multi-seed didn't just add CIs — it overturned the
+> conclusion. **Always report ≥3-seed.** (Qwen-32B-q4 ≈/below 14B — quantized scale
+> is not a lever on arbitrary-label graph-cls, unlike the network-science capability
+> ladder.)
 
-**Gaps closed / remaining:** multi-seed added for Opus on 6 domain reps + Qwen 3-seed
-throughout (CIs); Qwen format failures fixed via 32B except MSRC_21. Still open:
-full multi-seed Opus on all 30 (only reps have 3 seeds); MSRC_21 many-class format;
-and the genuine model weak spots (DBLP citation, NCI1, Fingerprint) are real, not
-artifacts.
+### DBLP_v1 failure — diagnosed (it was the seed, not the model)
+A dedicated diagnosis (workflow phase 2) found the seed11 below-chance result
+(0.343) was **5-shot-set contamination**, not a model deficit. The separating
+feature is clean: **CLASS1 = small dense cliques (mean density 0.81, ~70% perfect
+cliques), CLASS0 = larger sparse graphs (density 0.33)** — logreg learns "clique ⇒
+CLASS1" (0.87 train acc; top coefs avg_clustering +2.0, n_nodes −1.6). seed11's
+shot set happened to include 2 CLASS0 *cliques* and a sparse CLASS1, contradicting
+the heuristic → Opus inferred an anti-correlated rule and inverted 12/17 sparse
+true-CLASS0 queries. seeds 22/33 (clean shot sets) score 0.75/0.72. Lesson: with
+arbitrary integer class labels and a 5-shot budget, a contaminated demo set can flip
+the LLM's boundary on one seed — exactly why multi-seed is non-negotiable here.
+
+Note: the snapshot numbers below were 1-seed Opus for most datasets and are
+SUPERSEDED by the full 3-seed FINAL aggregate at the end of this section. The
+1-seed snapshot suggested "3 failures (DBLP/NCI1/Fingerprint)" — multi-seed showed
+all three were seed artifacts (see FINAL + DBLP diagnosis). Qwen-32B-q4 ≈/below 14B
+on these tasks; Qwen-32B fixed the 14B format failures (KKI/OHSU/ENZYMES) except
+MSRC_21 (20-class, both Qwen sizes ramble).
 
 ## Takeaway for the paper
 At low labels, across 25 datasets and 6 sciences, **one training-free pipeline
