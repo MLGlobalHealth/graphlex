@@ -99,8 +99,14 @@ covers all 30 (seed 11; + seeds 22/33 on 6 domain reps). Balanced accuracy:
 | model | n | mean regret | within 0.05 | beats classical | subst. worse (>0.10) |
 |---|---|---|---|---|---|
 | **Opus** | 30 | **−0.009** | 22/30 | 15/30 | 3/30: DBLP_v1, NCI1, Fingerprint |
-| Qwen-32B-q4 | ~23 | +0.02 | ~10/18 | ~8/18 | ~5/18 |
-| Qwen-14B | ~21 | ~0.00 | 17/21 | 13/21 | 3/21 |
+| Qwen-32B-q4 | 27 | +0.021 | 16/27 | 12/27 | 6/27 |
+| Qwen-14B | 21 | −0.000 | 17/21 | 13/21 | 3/21 |
+
+(Final balanced-accuracy aggregates, all arms complete. Qwen-32B-q4 is *slightly
+worse* than 14B on flexibility here — quantized 32B ≈/below 14B on arbitrary-label
+graph classification, so model scale is not a lever on this task family, unlike the
+network-science capability ladder. Opus is the only arm ahead of the baseline on
+average and the only one substantially-worse on ≤3 datasets.)
 
 **Holds across 8 sciences:** under balanced accuracy Opus is still *ahead on average*
 (−0.009) and within 0.05 on 22/30. New wins include MSRC_9 0.854, SYNTHETICnew 0.659,
