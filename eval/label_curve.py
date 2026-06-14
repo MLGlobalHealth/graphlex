@@ -23,7 +23,7 @@ sys.path.insert(0, '/home/scratch/Dropbox/Seth/Research/MLGHrepos/graphlex')
 from graphlex import facts, verbalize
 
 OUT = '/home/scratch/bench_out/labelcurve'
-SEEDS = [11, 22, 33]
+SEEDS = [11, 22, 33, 44, 55, 66, 77, 88]   # 8 seeds (Qwen runs all; Claude anchors at 11/22/33)
 K_LOGREG = [1, 2, 3, 5, 8, 12]
 K_LLM = [1, 3, 5]
 NQ = 30
@@ -104,6 +104,34 @@ def proteins_data(seed):
     return task, shotpool, queries, desc, dfacts, ['CLASS0', 'CLASS1']
 
 
+def imdb_data(seed):
+    """IMDB-BINARY: social collaboration graphs, NO node features, classes arbitrary
+    to the LLM (weak prior). Structure-only verbalization."""
+    from torch_geometric.datasets import TUDataset
+    from torch_geometric.utils import to_networkx
+    ds = TUDataset('/home/scratch/tudata', name='IMDB-BINARY')
+    idx = [i for i in range(len(ds)) if ds[i].num_nodes >= 3 and ds[i].edge_index.size(1) >= 1]
+    y = np.array([int(ds[i].y) for i in idx]); rng = np.random.RandomState(seed)
+
+    def G_of(j):
+        G = to_networkx(ds[idx[j]], to_undirected=True); G.remove_edges_from(nx.selfloop_edges(G))
+        return G
+    cls = {0: 'CLASS0', 1: 'CLASS1'}
+    pos = {c: list(rng.permutation([j for j in range(len(idx)) if y[j] == c])) for c in [0, 1]}
+    shotpool, qpool = {}, []
+    for c in [0, 1]:
+        shotpool[cls[c]] = [G_of(j) for j in pos[c][:POOL]]
+        qpool += pos[c][POOL:POOL + NQ // 2 + 5]
+    rng.shuffle(qpool); qpool = qpool[:NQ]
+    queries = [(G_of(j), cls[int(y[j])]) for j in qpool]
+    task = ("Each item is a movie-actor collaboration network; classify into CLASS0 or "
+            "CLASS1. Learn the pattern from the labeled examples, then classify each query.\n"
+            "OUTPUT FORMAT: one line per query, exactly '<id> <CLASS>'. No other text.")
+    desc = lambda G: verbalize(facts(G), focus='structure')
+    dfacts = lambda G: fvec(facts(G))
+    return task, shotpool, queries, desc, dfacts, ['CLASS0', 'CLASS1']
+
+
 def build_prompt(task, shotpool, queries, desc, k):
     L = [task, "", "=== LABELED EXAMPLES ==="]
     for labv, gs in shotpool.items():
@@ -133,7 +161,8 @@ def logreg_at(shotpool, queries, dfacts, k):
 
 if __name__ == "__main__":
     man = {"k_logreg": K_LOGREG, "k_llm": K_LLM, "tasks": {}}
-    for tname, loader in [('family', family_data), ('proteins', proteins_data)]:
+    for tname, loader in [('family', family_data), ('proteins', proteins_data),
+                          ('imdb', imdb_data)]:
         os.makedirs(f"{OUT}/{tname}/ans/opus", exist_ok=True)
         files = {}; lrc = {str(k): [] for k in K_LOGREG}
         for seed in SEEDS:
