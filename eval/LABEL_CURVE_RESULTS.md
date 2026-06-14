@@ -81,10 +81,16 @@ only Opus stays above logreg. Model *size within a family* helps (Qwen 14B→32B
 Qwen-32B) — capability, not parameter count alone. This sharpens the headline from
 "Opus-specific" to **"requires a high-capability model, shown across 5 families."**
 
-Caveat: PROTEINS/IMDB coverage for the new open families is **partial** (interrupted
-runs + format drift on the longer attributed prompts — several cells n<8 or missing),
-so only the FAMILY domain is a clean cross-family ladder; treat proteins/imdb
-multi-family cells as incomplete. Opus/Qwen rows there are the trustworthy ones.
+Coverage (after a strict-format completion pass): **IMDB is now ~complete** for the
+open families (21–24/24 seeds parse); **PROTEINS stays partial** — the small models
+fail to emit clean answer format on PROTEINS' long attributed prompts (structure +
+composition + bond lists) even with an explicit strict-format instruction:
+Gemma-2-9B 1/24, Mistral-7B & Gemma-2-27B ~7/24, Llama-3.1-8B 16/24 parse. This is a
+genuine small-model instruction-following limitation on long prompts, not a harness
+bug. (Qwen-32B was run on the FAMILY label-curve only.) PROTEINS/IMDB are near-chance
+for *all* methods anyway (weak prior), so **FAMILY remains the clean, meaningful
+cross-family ladder.** The label-efficiency figure (`fig_label_efficiency.png`) now
+plots all 7 models across the 3 panels.
 
 ## Caveats
 - 3 seeds, single ICL draw — family margins at k=1,3 are large/robust; PROTEINS

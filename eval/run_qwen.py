@@ -18,6 +18,16 @@ NUM_CTX = int(os.environ.get('NUM_CTX', '16384'))
 HOST = os.environ.get('QHOST', 'clpc35')
 OUTSUB = os.environ.get('OUTSUB', 'qwen')          # ans/<OUTSUB>/ output subdir
 DOMAINS = os.environ.get('DOMAINS', '')             # comma-sep domain filter, '' = all
+STRICT = os.environ.get('STRICT')                  # append a strict-format instruction
+REDO_UNPARSED = os.environ.get('REDO_UNPARSED')    # re-run files that have 0 parseable lines
+
+STRICT_SUFFIX = ("\n\nIMPORTANT: Output ONLY the answer lines, one per query, each "
+                 "EXACTLY '<id> <CLASS>' (e.g. '0 CLASS1'), in id order. No 'Query' "
+                 "prefix, no explanation, no blank lines, no markdown.")
+
+if REDO_UNPARSED:
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from _common import parse_ans
 
 
 def gen(prompt):
@@ -46,10 +56,12 @@ def main():
         os.makedirs(outdir, exist_ok=True)
         outf = f"{outdir}/{stem}.ans"
         if os.path.exists(outf) and os.path.getsize(outf) > 0:
-            done += 1
-            continue
+            if not REDO_UNPARSED or parse_ans(outf):
+                done += 1
+                continue
         try:
-            resp = gen(open(f).read())
+            prompt = open(f).read() + (STRICT_SUFFIX if STRICT else "")
+            resp = gen(prompt)
         except Exception as e:
             print(f"ERR {dom}/{stem}: {e}", flush=True)
             continue

@@ -253,6 +253,10 @@ def labelcurve_data():
             "opus": llm_scores(t, "opus"),
             "qwen14": llm_scores(t, "qwen"),
             "qwen32": llm_scores(t, "qwen32"),
+            "gemma2_27b": llm_scores(t, "gemma2_27b"),
+            "gemma2_9b": llm_scores(t, "gemma2_9b"),
+            "llama31_8b": llm_scores(t, "llama31_8b"),
+            "mistral_7b": llm_scores(t, "mistral_7b"),
         }
     return man["k_logreg"], data
 
@@ -275,11 +279,17 @@ def fig_label_efficiency(k_logreg, data):
     if len(order) == 1:
         axes = [axes]
 
+    # Opus + logreg are the focus (bold); open families are secondary (thinner).
     style = {
-        "opus":   dict(color="#1f77b4", marker="o", label="graphlex+LLM (Opus)"),
-        "qwen32": dict(color="#9467bd", marker="^", label="graphlex+LLM (Qwen-32B)"),
-        "qwen14": dict(color="#2ca02c", marker="s", label="graphlex+LLM (Qwen-14B)"),
+        "opus":       dict(color="#1f77b4", marker="o", label="graphlex+LLM (Opus, frontier)"),
+        "qwen32":     dict(color="#9467bd", marker="^", label="Qwen-32B"),
+        "qwen14":     dict(color="#2ca02c", marker="s", label="Qwen-14B"),
+        "gemma2_27b": dict(color="#e377c2", marker="X", label="Gemma-2-27B"),
+        "gemma2_9b":  dict(color="#8c564b", marker="P", label="Gemma-2-9B"),
+        "llama31_8b": dict(color="#ff7f0e", marker="v", label="Llama-3.1-8B"),
+        "mistral_7b": dict(color="#7f7f7f", marker="*", label="Mistral-7B"),
     }
+    open_models = ["qwen32", "qwen14", "gemma2_27b", "gemma2_9b", "llama31_8b", "mistral_7b"]
 
     for ax, t in zip(axes, order):
         d = data[t]
@@ -287,15 +297,19 @@ def fig_label_efficiency(k_logreg, data):
         # logreg curve (full k grid)
         lk, lm, ls = _ms(d["logreg"])
         ax.plot(lk, lm, color="#d62728", marker="D", lw=2.0, ms=5,
-                label="logreg (trained on same labels)", zorder=3)
+                label="logreg (trained on same labels)", zorder=5)
         ax.fill_between(lk, lm - ls, lm + ls, color="#d62728", alpha=0.12)
-        # LLM points (k = 1,3,5 where available)
-        for mk in ["opus", "qwen32", "qwen14"]:
-            if not d[mk]:
+        # open-family LLMs (thinner, secondary)
+        for mk in open_models:
+            if not d.get(mk):
                 continue
             kk, mm, ss = _ms(d[mk])
-            ax.errorbar(kk, mm, yerr=ss, lw=1.6, ms=6, capsize=2.5,
-                        zorder=4, **style[mk])
+            ax.plot(kk, mm, lw=1.1, ms=5, alpha=0.85, zorder=4, **style[mk])
+        # Opus on top (bold, with error band)
+        if d.get("opus"):
+            kk, mm, ss = _ms(d["opus"])
+            ax.errorbar(kk, mm, yerr=ss, lw=2.2, ms=7, capsize=2.5,
+                        zorder=6, **style["opus"])
         ax.axhline(ch, color="0.4", ls=":", lw=1.2)
         ax.text(k_logreg[-1], ch, " chance", va="center", ha="left",
                 fontsize=7.5, color="0.4")

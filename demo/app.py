@@ -373,8 +373,13 @@ PAGE = r"""<!doctype html>
   pre { white-space: pre-wrap; word-break: break-word; background:#1a202c; color:#e2e8f0;
         padding:12px; border-radius:8px; font-size:12px; overflow:auto; max-height:380px; }
   details summary { cursor:pointer; font-weight:600; font-size:13px; margin-top:10px; }
+  .promptwrap { position:relative; }
   .prompt { white-space: pre-wrap; background:#fffaf0; border:1px solid #feebc8;
-            border-radius:8px; padding:12px; font-size:13px; }
+            border-radius:8px; padding:12px; padding-top:34px; font-size:13px; }
+  .copybtn { position:absolute; top:6px; right:6px; font-size:12px; cursor:pointer;
+             background:#fff; color:#c05621; border:1px solid #feb2a8;
+             border-radius:6px; padding:3px 9px; }
+  .copybtn:hover { background:#fffaf0; }
   .answer { white-space: pre-wrap; background:#f0fff4; border:1px solid #c6f6d5;
             border-radius:8px; padding:12px; font-size:14px; }
   .hidden { display:none; }
@@ -445,7 +450,10 @@ PAGE = r"""<!doctype html>
     <button id="askBtn" class="ask" onclick="ask()">Ask the LLM</button>
     <div id="askOut" class="hidden">
       <div class="ctxlabel" id="promptLabel"></div>
-      <div id="prompt" class="prompt"></div>
+      <div class="promptwrap">
+        <button class="copybtn" onclick="copyPrompt(this)">Copy</button>
+        <div id="prompt" class="prompt"></div>
+      </div>
       <div class="ctxlabel" id="answerLabel">LLM answer:</div>
       <div id="answer" class="answer"></div>
     </div>
@@ -463,6 +471,21 @@ function buildPrompt(verb, q) {
     "description of its structure (you do NOT have the raw graph, only this " +
     "verbalized summary):\n\n" + verb + "\n\nQuestion: " + (q || "") + "\n\n" +
     "Answer concisely, citing the specific numbers above that justify your reasoning.";
+}
+function copyPrompt(btn) {
+  const txt = document.getElementById('prompt').textContent;
+  const done = () => { const o = btn.textContent; btn.textContent = 'Copied!';
+                       setTimeout(() => { btn.textContent = o; }, 1200); };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(txt).then(done).catch(() => fallbackCopy(txt, done));
+  } else { fallbackCopy(txt, done); }
+}
+function fallbackCopy(txt, done) {
+  const ta = document.createElement('textarea');
+  ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); done(); } catch (e) {}
+  document.body.removeChild(ta);
 }
 function updatePreview() {
   if (!lastVerbalization) return;
