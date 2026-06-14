@@ -249,6 +249,10 @@ const QUESTIONS = {
 };
 function onExample() {
   const ex = document.getElementById('example').value;
+  // Picking an example means "show this example": clear any pasted graph so it
+  // doesn't keep overriding the dropdown (run() prioritizes a non-empty edge list).
+  document.getElementById('edges').value = '';
+  document.getElementById('attrs').value = '';
   if (QUESTIONS[ex]) document.getElementById('question').value = QUESTIONS[ex];
   run();
 }
@@ -309,7 +313,7 @@ function run() {
   } catch (e) {
     alert("Error: " + e);
   } finally {
-    btn.disabled = false; btn.textContent = "Build the verbalization & prompt";
+    btn.disabled = false; btn.textContent = "Re-run / apply pasted graph";
   }
 }
 
