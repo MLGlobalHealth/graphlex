@@ -84,16 +84,24 @@ temp 0). Opus anchored at 3 seeds; Qwen + logreg at 8 seeds. **This revises the
 ### PROTEINS (chance 0.500) — mean ± std
 | k | Opus (3s) | Qwen-14B (8s) | logreg (8s) |
 |---|---|---|---|
-| 1 | 0.489 ± 0.042 | 0.567 ± 0.140 | 0.533 ± 0.093 |
-| 3 | 0.622 ± 0.063 | 0.578 ± 0.113 | 0.621 ± 0.074 |
-| 5 | 0.522 ± 0.042 | 0.633 ± 0.072 | 0.621 ± 0.078 |
+| 1 | 0.489 ± 0.042 | 0.567 ± 0.131 | 0.533 ± 0.093 |
+| 3 | 0.622 ± 0.063 | 0.604 ± 0.111 | 0.621 ± 0.074 |
+| 5 | 0.522 ± 0.042 | 0.587 ± 0.100 | 0.621 ± 0.078 |
 
 ### IMDB (chance 0.500) — mean ± std
 | k | Opus (3s) | Qwen-14B (8s) | logreg (8s) |
 |---|---|---|---|
 | 1 | 0.433 ± 0.000 | 0.471 ± 0.106 | 0.475 ± 0.081 |
 | 3 | 0.489 ± 0.096 | 0.575 ± 0.115 | 0.529 ± 0.096 |
-| 5 | 0.444 ± 0.150 | 0.514 ± 0.111 | 0.517 ± 0.107 |
+| 5 | 0.444 ± 0.150 | 0.517 ± 0.104 | 0.517 ± 0.107 |
+
+> Correction (2026-06-14): the Qwen-14B PROTEINS/IMDB cells above were re-scored after
+> a parser bug fix — `score_labelcurve.py` had used a strict regex that silently
+> dropped 9 Qwen answer files in "Query N CLASS" format, so those cells had been
+> computed on 3–7 seeds instead of 8 (PROTEINS k=3 0.578→0.604, k=5 0.633→0.587;
+> IMDB k=5 0.514→0.517). Family and all Opus numbers were unaffected (plain R/S/W
+> format parses identically); the label-efficiency figure already used the tolerant
+> parser. Conclusions unchanged (PROTEINS/IMDB remain near-chance for all methods).
 
 ### Revised, honest conclusion
 1. **The low-label LLM-beats-logreg win is real but NARROW: it requires a capable
