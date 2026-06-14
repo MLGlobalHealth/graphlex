@@ -10,6 +10,11 @@ def _fmt(groups):
     return ", ".join(str(g) for g in groups)
 
 
+def _p(n, noun):
+    """'1 node' / '2 nodes' — correct singular/plural."""
+    return f"{n} {noun}" if n == 1 else f"{n} {noun}s"
+
+
 def _assort_phrase(a):
     if a != a:  # NaN
         return "undefined"
@@ -23,8 +28,8 @@ def _assort_phrase(a):
 def _structure(f):
     s = f["structure"]
     out = (
-        f"Network: {s['n_nodes']} nodes, {s['n_edges']} edges "
-        f"(density {s['density']:.2f}), {s['n_components']} connected component(s). "
+        f"Network: {_p(s['n_nodes'], 'node')}, {_p(s['n_edges'], 'edge')} "
+        f"(density {s['density']:.2f}), {_p(s['n_components'], 'connected component')}. "
         f"Mean degree {s['mean_degree']:.1f} (max {s['max_degree']}, "
         f"std {s['degree_std']:.1f}, max/mean {s['max_over_mean_degree']:.1f}). "
         f"Average clustering {s['avg_clustering']:.2f}, transitivity {s['transitivity']:.2f}. "
@@ -37,11 +42,11 @@ def _structure(f):
         rs = s.get("ring_sizes")
         if rs:
             ringstr = ", ".join(f"{sz}-rings x{c}" for sz, c in rs.items())
-            out += f"{s['n_cycles']} independent cycles ({ringstr}). "
+            out += f"{_p(s['n_cycles'], 'independent cycle')} ({ringstr}). "
         elif rs == {}:
-            out += f"{s['n_cycles']} independent cycles (acyclic or no small rings). "
+            out += f"{_p(s['n_cycles'], 'independent cycle')} (acyclic or no small rings). "
         else:
-            out += f"{s['n_cycles']} independent cycles. "
+            out += f"{_p(s['n_cycles'], 'independent cycle')}. "
     out += (f"{s['n_communities']} communit{'y' if s['n_communities']==1 else 'ies'} "
             f"detected.")
     return out
