@@ -98,14 +98,15 @@
         </div>
         <div>
           <label for="edges">Edge list (e.g. <code>0-1, 1-2, 2-0</code>)</label>
-          <textarea id="edges" rows="3" placeholder="0-1, 1-2, 2-0, 2-3"></textarea>
+          <textarea id="edges" rows="3" placeholder="0-1, 1-2, 2-0, 2-3" onchange="run()"></textarea>
           <label for="attrs">Optional node attributes (e.g. <code>0:A, 1:A, 2:B</code>)</label>
-          <textarea id="attrs" rows="2" placeholder="0:A, 1:A, 2:B, 3:B"></textarea>
+          <textarea id="attrs" rows="2" placeholder="0:A, 1:A, 2:B, 3:B" onchange="run()"></textarea>
         </div>
       </div>
-      <label for="question">Question for the LLM</label>
-      <input type="text" id="question">
-      <button id="go" onclick="run()">Build the verbalization &amp; prompt</button>
+      <label for="question">Question for the LLM (the prompt updates as you type)</label>
+      <input type="text" id="question" oninput="onQ()">
+      <button id="go" onclick="run()">Re-run / apply pasted graph</button>
+      <span class="muted">&nbsp; Examples &amp; pasted graphs update automatically; this button just forces a re-run.</span>
     </div>
 
     <div id="out" class="card hidden">
@@ -251,7 +252,21 @@ function onExample() {
   if (QUESTIONS[ex]) document.getElementById('question').value = QUESTIONS[ex];
   run();
 }
-let pyodide = null, analyzeFn = null;
+let pyodide = null, analyzeFn = null, lastVerb = "";
+
+// Mirrors the server-side prompt built in Python EXACTLY — keep in sync.
+function buildPrompt(verb, q) {
+  return "You are analyzing a graph. Here is a factual, deterministically-computed " +
+    "description of its structure (you do NOT have the raw graph, only this " +
+    "verbalized summary):\n\n" + verb + "\n\nQuestion: " + (q || "") + "\n\n" +
+    "Answer concisely, citing the specific numbers above that justify your reasoning.";
+}
+// Live prompt update as the question is typed (no recompute needed).
+function onQ() {
+  if (!lastVerb) return;
+  document.getElementById('prompt').textContent =
+    buildPrompt(lastVerb, document.getElementById('question').value);
+}
 
 async function boot() {
   try {
@@ -287,6 +302,7 @@ function run() {
     document.getElementById('verb').textContent = d.verbalization;
     document.getElementById('facts').textContent = d.facts_json;
     document.getElementById('prompt').textContent = d.prompt;
+    lastVerb = d.verbalization;   // enable instant question->prompt updates
     document.getElementById('promptLabel').textContent =
       "Prompt to copy (verbalized facts + your question; no raw structure) — paste into any chatbot:";
     drawGraph(d);
