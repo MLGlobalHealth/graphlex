@@ -69,12 +69,30 @@
       <div class="row">
         <div>
           <label for="example">Built-in example</label>
-          <select id="example">
-            <option value="office">Office collaboration (dept + seniority)</option>
-            <option value="er">Random (Erdős–Rényi)</option>
-            <option value="ba">Scale-free (Barabási–Albert)</option>
-            <option value="ws">Small-world (Watts–Strogatz)</option>
-            <option value="molecule">Molecule (benzene + nitro group)</option>
+          <select id="example" onchange="onExample()">
+            <optgroup label="Social / real">
+              <option value="office">Office collaboration (dept + seniority)</option>
+              <option value="karate">Zachary's Karate Club (club split)</option>
+              <option value="florentine">Florentine families (Renaissance marriages)</option>
+              <option value="lesmis">Les Misérables (character co-occurrence)</option>
+              <option value="sbm">Stochastic block model (3 communities)</option>
+            </optgroup>
+            <optgroup label="Generative families">
+              <option value="er">Random (Erdős–Rényi)</option>
+              <option value="ba">Scale-free (Barabási–Albert)</option>
+              <option value="ws">Small-world (Watts–Strogatz)</option>
+              <option value="powerlaw">Scale-free + clustering (Holme–Kim)</option>
+            </optgroup>
+            <optgroup label="Structural / pedagogical">
+              <option value="caveman">Connected caveman (cliques + bridges)</option>
+              <option value="grid">2-D lattice grid (5×5)</option>
+              <option value="tree">Balanced tree (hierarchy)</option>
+              <option value="star">Star (one hub)</option>
+              <option value="complete">Complete graph (all-to-all)</option>
+            </optgroup>
+            <optgroup label="Chemistry">
+              <option value="molecule">Molecule (benzene + nitro group)</option>
+            </optgroup>
           </select>
           <p class="muted">Or paste your own on the right (used instead of the example if non-empty).</p>
         </div>
@@ -86,7 +104,7 @@
         </div>
       </div>
       <label for="question">Question for the LLM</label>
-      <input type="text" id="question" value="Is this network random, scale-free, or small-world, and why?">
+      <input type="text" id="question">
       <button id="go" onclick="run()">Build the verbalization &amp; prompt</button>
     </div>
 
@@ -146,10 +164,27 @@ def _molecule():
     G.add_edge(6,8); G.nodes[8]["atom"]="Oxygen"
     return G,"atom"
 
-def _gen(kind):
-    if kind=="er": return nx.erdos_renyi_graph(24,0.18,seed=7),None
-    if kind=="ba": return nx.barabasi_albert_graph(24,2,seed=7),None
-    return nx.watts_strogatz_graph(24,4,0.2,seed=7),None
+def _karate():    return nx.karate_club_graph(),"club"
+def _florentine():return nx.florentine_families_graph(),None
+def _lesmis():    return nx.les_miserables_graph(),None
+def _sbm():
+    G=nx.stochastic_block_model([8,8,8],[[.45,.04,.02],[.04,.45,.03],[.02,.03,.45]],seed=7)
+    nm={0:"A",1:"B",2:"C"}
+    for n in G: G.nodes[n]["block"]=nm[G.nodes[n]["block"]]
+    return G,"block"
+def _caveman(): return nx.connected_caveman_graph(4,5),None
+def _grid():    return nx.convert_node_labels_to_integers(nx.grid_2d_graph(5,5)),None
+def _tree():    return nx.balanced_tree(2,3),None
+def _star():    return nx.star_graph(12),None
+def _complete():return nx.complete_graph(8),None
+def _powerlaw():return nx.powerlaw_cluster_graph(30,2,0.3,seed=7),None
+def _er():      return nx.erdos_renyi_graph(24,0.18,seed=7),None
+def _ba():      return nx.barabasi_albert_graph(24,2,seed=7),None
+def _ws():      return nx.watts_strogatz_graph(24,4,0.2,seed=7),None
+
+BUILDERS={"office":_office,"molecule":_molecule,"karate":_karate,"florentine":_florentine,
+          "lesmis":_lesmis,"sbm":_sbm,"caveman":_caveman,"grid":_grid,"tree":_tree,
+          "star":_star,"complete":_complete,"powerlaw":_powerlaw,"er":_er,"ba":_ba,"ws":_ws}
 
 def _from_text(edges_text, attrs_text):
     G=nx.Graph()
@@ -172,9 +207,7 @@ def _from_text(edges_text, attrs_text):
 
 def analyze(example, edges_text, attrs_text, question):
     if edges_text.strip(): G,attr=_from_text(edges_text,attrs_text)
-    elif example=="office": G,attr=_office()
-    elif example=="molecule": G,attr=_molecule()
-    else: G,attr=_gen(example)
+    else: G,attr=BUILDERS.get(example,_office)()
     if G.number_of_nodes()==0: return json.dumps({"error":"Empty graph — check your edge list."})
     na=[attr] if attr else None
     f=facts(G,node_attrs=na)
@@ -196,6 +229,28 @@ def analyze(example, edges_text, attrs_text, question):
 <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
 <script>
 const PALETTE = ["#a6cee3","#fdbf6f","#b2df8a","#cab2d6","#fb9a99","#ffff99","#fccde5","#ccebc5"];
+const QUESTIONS = {
+  office: "Who bridges the two departments, and is the network homophilous on dept?",
+  karate: "This club later split in two — from the structure alone, who are the key figures and is there a clear two-faction split?",
+  florentine: "Which family is most central in this marriage network, and why?",
+  lesmis: "What does the community structure suggest about how the characters group together?",
+  sbm: "How many communities are there, and how cleanly do they separate?",
+  er: "Is this network random, scale-free, or small-world, and why?",
+  ba: "Is this network random, scale-free, or small-world, and why?",
+  ws: "Is this network random, scale-free, or small-world, and why?",
+  powerlaw: "Is this network scale-free, and does it also show clustering? Why?",
+  caveman: "Describe the community/clique structure and the bridges between groups.",
+  grid: "What regular structure is this? Describe its clustering and typical path lengths.",
+  tree: "Is this a tree/hierarchy? Describe its branching and depth.",
+  star: "Is this network centralized around a single hub? What is the evidence?",
+  complete: "How densely connected is this network?",
+  molecule: "Which functional groups does this molecule contain, and what might that imply?",
+};
+function onExample() {
+  const ex = document.getElementById('example').value;
+  if (QUESTIONS[ex]) document.getElementById('question').value = QUESTIONS[ex];
+  run();
+}
 let pyodide = null, analyzeFn = null;
 
 async function boot() {
@@ -210,7 +265,7 @@ async function boot() {
     analyzeFn = pyodide.globals.get("analyze");
     document.querySelector('#app').classList.remove('hidden');
     document.querySelector('.card #status').closest('.card').classList.add('hidden');
-    run();  // show the default example immediately
+    onExample();  // set the default example's question + show it immediately
   } catch (e) {
     document.getElementById('status').textContent = "Failed to load: " + e;
   }
