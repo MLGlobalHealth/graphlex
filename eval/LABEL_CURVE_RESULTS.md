@@ -64,3 +64,54 @@ classical+logreg remains the right tool). Combined with the zero-label result
 - family is synthetic (clean ground truth); the prior-driven head-start there is
   partly the model knowing ER/BA/WS — which is the point (priors = free labels),
   but means the family gap is an upper bound on the effect.
+
+---
+
+## HARDENED (2026-06-14): 8 seeds, 3 domains, TWO model families
+
+Added IMDB (social/weak-prior), bumped to 8 seeds, and added a non-Claude model:
+**Qwen2.5-14B-Instruct** run locally on clpc35 (Ollama; driver `eval/run_qwen.py`,
+temp 0). Opus anchored at 3 seeds; Qwen + logreg at 8 seeds. **This revises the
+3-seed conclusion above.**
+
+### FAMILY (chance 0.333) — mean ± std
+| k | Opus (3s) | Qwen-14B (8s) | logreg (8s) |
+|---|---|---|---|
+| 1 | **0.878 ± 0.079** | 0.521 ± 0.120 | 0.567 ± 0.174 |
+| 3 | **0.900 ± 0.047** | 0.658 ± 0.089 | 0.804 ± 0.098 |
+| 5 | 0.922 ± 0.016 | 0.708 ± 0.062 | 0.887 ± 0.104 |
+
+### PROTEINS (chance 0.500) — mean ± std
+| k | Opus (3s) | Qwen-14B (8s) | logreg (8s) |
+|---|---|---|---|
+| 1 | 0.489 ± 0.042 | 0.567 ± 0.140 | 0.533 ± 0.093 |
+| 3 | 0.622 ± 0.063 | 0.578 ± 0.113 | 0.621 ± 0.074 |
+| 5 | 0.522 ± 0.042 | 0.633 ± 0.072 | 0.621 ± 0.078 |
+
+### IMDB (chance 0.500) — mean ± std
+| k | Opus (3s) | Qwen-14B (8s) | logreg (8s) |
+|---|---|---|---|
+| 1 | 0.433 ± 0.000 | 0.471 ± 0.106 | 0.475 ± 0.081 |
+| 3 | 0.489 ± 0.096 | 0.575 ± 0.115 | 0.529 ± 0.096 |
+| 5 | 0.444 ± 0.150 | 0.514 ± 0.111 | 0.517 ± 0.107 |
+
+### Revised, honest conclusion
+1. **The low-label LLM-beats-logreg win is real but NARROW: it requires a capable
+   model AND a prior-rich domain.** The only robust instance is **Opus on family**
+   (k=1: 0.878 vs logreg 0.567, ±0.08 — large and stable; k=3: 0.900 vs 0.804).
+2. **It is NOT a generic "LLM" property.** **Qwen-14B does not beat logreg** — it is
+   *below* logreg on family at k=3,5 (0.658/0.708 vs 0.804/0.887). A weaker model
+   loses the advantage entirely.
+3. **On weak-prior real graphs (PROTEINS, IMDB) it's a wash near chance** — Opus,
+   Qwen, and logreg all sit within noise of each other (and of chance). No LLM
+   advantage, but not "strictly worse" either. (Structure-only is just weak here.)
+4. So the earlier 3-seed "LLM ≥ logreg at low k on both domains" was **over-read**;
+   with 8 seeds + a second model the PROTEINS edge vanishes into noise and the
+   family win turns out to be Opus-specific (capability-gated).
+
+**Implication for the paper:** the "effective" (beats logreg) claim must be scoped
+to *frontier-model + prior-rich task* and stated with the model-capability
+dependence shown explicitly. The broad, safe claim remains the **zero-label
+capability** (logreg can't run at all) + flexibility; the *beats-logreg-with-labels*
+claim is a narrower, capability-gated result. Pending: Qwen-32B on family to test
+whether scale (not Claude-ness) recovers the win.

@@ -53,8 +53,8 @@ def _ring_sizes(G, n, m):
     sees). Exact for small graphs; skipped (None) above caps to stay cheap. No LLM."""
     if n < 3 or m < n:                      # acyclic or trivially small
         return {} if m >= n and n >= 3 else {}
-    if n > 400 or m > 1200:
-        return None
+    if n > 400 or m > 1200 or (m - n) > 60:  # too many independent cycles to basis cheaply
+        return None                          # (dense graphs, e.g. social ego-nets)
     try:
         basis = nx.minimum_cycle_basis(G)
     except Exception:

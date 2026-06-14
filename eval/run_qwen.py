@@ -16,6 +16,8 @@ MODEL = os.environ.get('QMODEL', 'qwen2.5:14b-instruct')
 ROOT = sys.argv[1] if len(sys.argv) > 1 else '/home/scratch/bench_out/labelcurve'
 NUM_CTX = int(os.environ.get('NUM_CTX', '16384'))
 HOST = os.environ.get('QHOST', 'clpc35')
+OUTSUB = os.environ.get('OUTSUB', 'qwen')          # ans/<OUTSUB>/ output subdir
+DOMAINS = os.environ.get('DOMAINS', '')             # comma-sep domain filter, '' = all
 
 
 def gen(prompt):
@@ -32,12 +34,15 @@ def gen(prompt):
 def main():
     pats = ["seed*_k*.txt", "seed*_shot*.txt", "seed*.txt"]
     files = sorted({f for pat in pats for f in glob.glob(f"{ROOT}/*/{pat}")})
-    print(f"model={MODEL} host={HOST} root={ROOT} files={len(files)}", flush=True)
+    if DOMAINS:
+        keep = set(DOMAINS.split(','))
+        files = [f for f in files if f.split('/')[-2] in keep]
+    print(f"model={MODEL} host={HOST} root={ROOT} out={OUTSUB} files={len(files)}", flush=True)
     done = ok = 0
     for f in files:
         dom = f.split('/')[-2]
         stem = os.path.basename(f)[:-4]
-        outdir = f"{ROOT}/{dom}/ans/qwen"
+        outdir = f"{ROOT}/{dom}/ans/{OUTSUB}"
         os.makedirs(outdir, exist_ok=True)
         outf = f"{outdir}/{stem}.ans"
         if os.path.exists(outf) and os.path.getsize(outf) > 0:
