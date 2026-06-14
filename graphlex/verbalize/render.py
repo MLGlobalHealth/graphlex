@@ -10,15 +10,32 @@ def _fmt(groups):
     return ", ".join(str(g) for g in groups)
 
 
+def _assort_phrase(a):
+    if a != a:  # NaN
+        return "undefined"
+    if a >= 0.10:
+        return f"{a:+.2f} (assortative: hubs link to hubs)"
+    if a <= -0.10:
+        return f"{a:+.2f} (disassortative: hubs link to low-degree nodes)"
+    return f"{a:+.2f} (neutral)"
+
+
 def _structure(f):
     s = f["structure"]
-    return (
+    out = (
         f"Network: {s['n_nodes']} nodes, {s['n_edges']} edges "
         f"(density {s['density']:.2f}), {s['n_components']} connected component(s). "
-        f"Mean degree {s['mean_degree']:.1f} (max {s['max_degree']}), "
-        f"average clustering {s['avg_clustering']:.2f}. "
-        f"{s['n_communities']} communit{'y' if s['n_communities']==1 else 'ies'} detected."
+        f"Mean degree {s['mean_degree']:.1f} (max {s['max_degree']}, "
+        f"std {s['degree_std']:.1f}, max/mean {s['max_over_mean_degree']:.1f}). "
+        f"Average clustering {s['avg_clustering']:.2f}, transitivity {s['transitivity']:.2f}. "
+        f"Degree assortativity {_assort_phrase(s['degree_assortativity'])}. "
     )
+    if s.get("avg_path_length") is not None:
+        out += (f"Largest component: average path length {s['avg_path_length']:.2f}, "
+                f"diameter {s['diameter']}. ")
+    out += (f"{s['n_communities']} communit{'y' if s['n_communities']==1 else 'ies'} "
+            f"detected.")
+    return out
 
 
 def _attribute(f, attr, a):
