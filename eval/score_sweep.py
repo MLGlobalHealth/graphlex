@@ -6,7 +6,8 @@ import numpy as np
 
 B = '/home/scratch/bench_out/sweep'
 man = json.load(open(f"{B}/manifest.json"))
-LINE = re.compile(r'^\s*(\d+)\s+([A-Za-z0-9_]+)\s*$')
+# tolerant: handles "0 CLASS0", "Query 0 CLASS0", "0: CLASS0", "0) CLASS0"
+LINE = re.compile(r'^\s*(?:query\s*)?(\d+)\s*[:.\)\-]?\s+([A-Za-z0-9_]+)\s*$', re.I)
 
 
 def parse(p):
@@ -53,10 +54,22 @@ for dom, ds, ch, cl, mj, qw, op in rows:
     qrs = f"{qr:+.3f}" if qr is not None else "   -"
     print(f"{dom:12} {ds:16} {ch:7.3f} {cl:9.3f} {mj:7.3f} {f(qw):>8} {f(op):>7} {qrs:>8}")
 
-print("\n=== flexibility summary (Qwen-14b vs best non-LLM baseline) ===")
-if qreg:
-    qreg = np.array(qreg)
-    print(f"datasets scored: {len(qreg)} across {len(set(r[0] for r in rows))} domains")
-    print(f"mean regret {qreg.mean():+.3f} | median {np.median(qreg):+.3f} | "
-          f"worst {qreg.max():+.3f} | Qwen >= baseline-0.05 on "
-          f"{int((qreg <= 0.05).sum())}/{len(qreg)} datasets")
+def summary(name, getter):
+    regs = []
+    for dom, ds, ch, cl, mj, qw, op in rows:
+        v = getter(qw, op)
+        if v is not None:
+            regs.append(max(cl, mj) - v)
+    if not regs:
+        return
+    r = np.array(regs)
+    print(f"\n=== flexibility: {name} vs best non-LLM baseline ===")
+    print(f"  scored {len(r)} datasets / {len(set(x[0] for x in rows))} domains | "
+          f"mean regret {r.mean():+.3f} | median {np.median(r):+.3f} | worst {r.max():+.3f}")
+    print(f"  >= baseline (regret<=0): {int((r<=0).sum())}/{len(r)} | "
+          f"within 0.05: {int((r<=0.05).sum())}/{len(r)} | "
+          f"substantially worse (>0.10): {int((r>0.10).sum())}/{len(r)}")
+
+
+summary("Qwen-14b (3 seeds)", lambda qw, op: qw)
+summary("Opus (seed11)", lambda qw, op: op)
