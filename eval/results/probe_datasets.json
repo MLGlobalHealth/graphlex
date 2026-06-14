@@ -295,5 +295,93 @@
 "has_x": true,
 "ncat": 0,
 "chance": 0.1
+},
+{
+"name": "DBLP_v1",
+"domain": "citation",
+"n": 19456,
+"classes": 2,
+"avgN": 10.2,
+"avgE": 19.6,
+"has_x": true,
+"ncat": 41325,
+"chance": 0.51
+},
+{
+"name": "FIRSTMM_DB",
+"domain": "robotics",
+"n": 41,
+"classes": 11,
+"avgN": 1377.3,
+"avgE": 3073.8,
+"has_x": true,
+"ncat": 5,
+"chance": 0.146
+},
+{
+"name": "Cuneiform",
+"domain": "archaeology",
+"n": 267,
+"classes": 30,
+"avgN": 20.9,
+"avgE": 43.8,
+"has_x": true,
+"ncat": 7,
+"chance": 0.034
+},
+{
+"name": "COIL-DEL",
+"domain": "vision",
+"n": 3900,
+"classes": 100,
+"avgN": 22.8,
+"avgE": 58.0,
+"has_x": true,
+"ncat": 0,
+"chance": 0.01
+},
+{
+"name": "FRANKENSTEIN",
+"domain": "chemistry",
+"n": 4337,
+"classes": 2,
+"avgN": 16.4,
+"avgE": 17.3,
+"has_x": true,
+"ncat": 0,
+"chance": 0.554
+},
+{
+"name": "REDDIT-MULTI-5K",
+"domain": "social",
+"n": 4999,
+"classes": 5,
+"avgN": 885.5,
+"avgE": 1091.6,
+"has_x": false,
+"ncat": 0,
+"chance": 0.2
+},
+{
+"name": "MSRC_9",
+"domain": "vision",
+"n": 221,
+"classes": 8,
+"avgN": 40.9,
+"avgE": 98.6,
+"has_x": true,
+"ncat": 10,
+"chance": 0.136
+},
+{
+"name": "SYNTHETICnew",
+"domain": "synthetic",
+"n": 300,
+"classes": 2,
+"avgN": 100.0,
+"avgE": 196.1,
+"has_x": true,
+"ncat": 0,
+"chance": 0.5
 }
 ]

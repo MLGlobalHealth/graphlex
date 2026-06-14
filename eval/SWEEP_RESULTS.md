@@ -87,6 +87,38 @@ metric** and is what we report as primary.
 - Several datasets are near chance for everyone (ENZYMES, COLORS-3, KKI) — weak
   signal, not a differentiator.
 
+## EXPANDED (2026-06-14): 30 datasets across 8 sciences
+
+Added 5 new datasets in genuinely new domains — **citation** (DBLP_v1), **archaeology**
+(Cuneiform), plus FRANKENSTEIN (chem), MSRC_9 (vision), SYNTHETICnew (synthetic).
+(Attempted robotics/FIRSTMM_DB but its graphs are too large + only 41 graphs for 11
+classes → skipped; COIL-DEL 100-class and REDDIT-MULTI-5K also skipped.) DBLP's
+41k-dim bag-of-words features exceed the composition cap → structure-only. Opus now
+covers all 30 (seed 11; + seeds 22/33 on 6 domain reps). Balanced accuracy:
+
+| model | n | mean regret | within 0.05 | beats classical | subst. worse (>0.10) |
+|---|---|---|---|---|---|
+| **Opus** | 30 | **−0.009** | 22/30 | 15/30 | 3/30: DBLP_v1, NCI1, Fingerprint |
+| Qwen-32B-q4 | ~23 | +0.02 | ~10/18 | ~8/18 | ~5/18 |
+| Qwen-14B | ~21 | ~0.00 | 17/21 | 13/21 | 3/21 |
+
+**Holds across 8 sciences:** under balanced accuracy Opus is still *ahead on average*
+(−0.009) and within 0.05 on 22/30. New wins include MSRC_9 0.854, SYNTHETICnew 0.659,
+PROTEINS 0.736. **New honest failures:** **DBLP_v1 (citation): Opus 0.343 vs classical
+0.664 — a real, large miss** (structure-only citation ego-graphs; the LLM does worse
+than chance while logreg finds structural signal); also NCI1 and Fingerprint persist.
+**Qwen-32B-q4 is not better than 14B here** — on these low-label classification tasks
+the quantized 32B ≈ 14B (the clean capability ladder was on family/network-science,
+not on arbitrary-label graph classification). Qwen-32B did fix the 14B format
+failures (KKI/OHSU/ENZYMES now score). MSRC_21 still rambles for both Qwen sizes
+(20-class prompt).
+
+**Gaps closed / remaining:** multi-seed added for Opus on 6 domain reps + Qwen 3-seed
+throughout (CIs); Qwen format failures fixed via 32B except MSRC_21. Still open:
+full multi-seed Opus on all 30 (only reps have 3 seeds); MSRC_21 many-class format;
+and the genuine model weak spots (DBLP citation, NCI1, Fingerprint) are real, not
+artifacts.
+
 ## Takeaway for the paper
 At low labels, across 25 datasets and 6 sciences, **one training-free pipeline
 (graphlex+LLM) is competitive with — and on average slightly better than — a

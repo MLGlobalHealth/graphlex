@@ -6,18 +6,17 @@ import numpy as np
 from torch_geometric.datasets import TUDataset
 
 ROOT = '/home/scratch/tudata'
-# (name, domain) — broad coverage; some may fail/rename, that's fine (reported).
+MERGE = '/home/scratch/bench_out/probe_datasets.json'  # append to existing if present
+# (name, domain) — NEW domains/datasets to add to the sweep. Some may fail/rename.
 CAND = [
-    ('MUTAG', 'chemistry'), ('PTC_MR', 'chemistry'), ('BZR', 'chemistry'),
-    ('COX2', 'chemistry'), ('DHFR', 'chemistry'), ('AIDS', 'chemistry'),
-    ('NCI1', 'chemistry'), ('Mutagenicity', 'chemistry'),
-    ('PROTEINS', 'biology'), ('ENZYMES', 'biology'), ('DD', 'biology'),
-    ('KKI', 'neuroscience'), ('OHSU', 'neuroscience'), ('Peking_1', 'neuroscience'),
-    ('IMDB-BINARY', 'social'), ('IMDB-MULTI', 'social'), ('COLLAB', 'social'),
-    ('REDDIT-BINARY', 'social'), ('deezer_ego_nets', 'social'),
-    ('github_stargazers', 'social'), ('twitch_egos', 'social'),
-    ('Letter-high', 'vision'), ('MSRC_21', 'vision'), ('Fingerprint', 'vision'),
-    ('Synthie', 'synthetic'), ('COLORS-3', 'synthetic'), ('TRIANGLES', 'synthetic'),
+    ('DBLP_v1', 'citation'),            # scholarly citation/coauthor ego-graphs
+    ('FIRSTMM_DB', 'robotics'),         # 3D point-cloud object graphs (robotics)
+    ('Cuneiform', 'archaeology'),       # cuneiform sign graphs (epigraphy)
+    ('COIL-DEL', 'vision'),             # object images -> graphs
+    ('FRANKENSTEIN', 'chemistry'),      # molecules (MNIST-substituted atoms)
+    ('REDDIT-MULTI-5K', 'social'),      # online discussion threads (5 classes)
+    ('MSRC_9', 'vision'),               # semantic image graphs
+    ('SYNTHETICnew', 'synthetic'),
 ]
 
 rows = []
@@ -39,7 +38,12 @@ for name, dom in CAND:
               f"feat={has_x}({ncat}) chance={chance:.3f}", flush=True)
     except Exception as e:
         print(f"FAIL {name:18} {dom:12} {type(e).__name__}: {str(e)[:90]}", flush=True)
-json.dump([dict(zip(['name','domain','n','classes','avgN','avgE','has_x','ncat','chance'], r))
-           for r in rows], open('/home/scratch/bench_out/probe_datasets.json', 'w'), indent=0)
-print(f"\n{len(rows)} datasets OK across "
-      f"{len(set(r[1] for r in rows))} domains -> /home/scratch/bench_out/probe_datasets.json")
+new = [dict(zip(['name', 'domain', 'n', 'classes', 'avgN', 'avgE', 'has_x', 'ncat', 'chance'], r))
+       for r in rows]
+import os
+existing = json.load(open(MERGE)) if os.path.exists(MERGE) else []
+have = {d['name'] for d in existing}
+merged = existing + [d for d in new if d['name'] not in have]
+json.dump(merged, open(MERGE, 'w'), indent=0)
+print(f"\n{len(new)} new OK; merged total {len(merged)} datasets across "
+      f"{len(set(d['domain'] for d in merged))} domains -> {MERGE}")

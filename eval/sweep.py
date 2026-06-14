@@ -29,6 +29,8 @@ SHOTS_PER_CLASS = 5
 MAX_SHOTS = 60          # cap total in-context shots (many-class datasets)
 NQ = 40
 SKIP_HUGE_AVGN = 150    # skip datasets whose graphs are enormous (cost); reported
+SKIP_MANY_CLASS = 30    # skip datasets with too many classes for ICL (e.g. COIL-DEL=100)
+MAX_NCAT = 50           # above this, node features aren't usable as composition -> structure-only
 POOL_CAP = 4000         # only consider first N graphs (avoid iterating 100k-graph sets)
 FKEYS = ['n_nodes', 'n_edges', 'density', 'n_components', 'mean_degree', 'max_degree',
          'degree_std', 'max_over_mean_degree', 'avg_clustering', 'transitivity',
@@ -86,6 +88,8 @@ def run_one(name, domain):
         used = set(shot + q)
         cc = {j: node_cats(ds[idx[j]]) for j in used}
         ncat = max((cc[j][1] for j in used), default=0)
+        if ncat > MAX_NCAT:                       # huge vocab (e.g. DBLP bag-of-words) -> structure only
+            cc = {j: (None, 0) for j in used}; ncat = 0
         has_attr = any(cc[j][0] is not None for j in used)
         na = ['type'] if has_attr else []
         fcache = {j: facts(to_nx(ds[idx[j]], cc[j][0]), node_attrs=na) for j in used}
@@ -127,6 +131,9 @@ if __name__ == "__main__":
     for d in probe:
         if d['avgN'] > SKIP_HUGE_AVGN:
             print(f"skip {d['name']} (avgN {d['avgN']} > {SKIP_HUGE_AVGN})", flush=True)
+            continue
+        if d['classes'] > SKIP_MANY_CLASS:
+            print(f"skip {d['name']} (classes {d['classes']} > {SKIP_MANY_CLASS})", flush=True)
             continue
         try:
             files, base = run_one(d['name'], d['domain'])

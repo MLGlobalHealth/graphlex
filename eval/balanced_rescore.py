@@ -101,22 +101,23 @@ rows = []
 for ds, meta in sorted(man['meta'].items(), key=lambda kv: (kv[1]['domain'], kv[0])):
     ncls = meta['classes']
     cl, mj = classical_majority_balacc(ds)
-    qw, op = llm_balacc(ds, 'qwen'), llm_balacc(ds, 'opus')
-    rows.append((meta['domain'], ds, 1.0/ncls, cl, mj, qw, op))
+    qw = llm_balacc(ds, 'qwen'); q32 = llm_balacc(ds, 'qwen32'); op = llm_balacc(ds, 'opus')
+    rows.append((meta['domain'], ds, 1.0/ncls, cl, mj, qw, q32, op))
 
-hdr = f"{'domain':12} {'dataset':16} {'chance':>7} {'classical':>9} {'major':>7} {'Qwen14b':>8} {'Opus':>7}"
+hdr = f"{'domain':12} {'dataset':16} {'chance':>7} {'classic':>8} {'Qwen14':>7} {'Qwen32':>7} {'Opus':>7}"
 print("BALANCED ACCURACY (macro recall; majority==chance)\n")
 print(hdr); print('-'*len(hdr))
-for dom, ds, ch, cl, mj, qw, op in rows:
+for dom, ds, ch, cl, mj, qw, q32, op in rows:
     f = lambda x: f"{x:.3f}" if x is not None else "   -"
-    print(f"{dom:12} {ds:16} {ch:7.3f} {cl:9.3f} {mj:7.3f} {f(qw):>8} {f(op):>7}")
+    print(f"{dom:12} {ds:16} {ch:7.3f} {cl:8.3f} {f(qw):>7} {f(q32):>7} {f(op):>7}")
 
-for nm, gi in [("Qwen-14b", 5), ("Opus", 6)]:
+for nm, gi in [("Qwen-14b", 5), ("Qwen-32b", 6), ("Opus", 7)]:
     reg = [max(r[3], r[4]) - r[gi] for r in rows if r[gi] is not None]
     if reg:
         reg = np.array(reg)
         beat_cl = [r[gi] - r[3] for r in rows if r[gi] is not None]
-        print(f"\n{nm} vs best non-LLM (balanced acc): mean regret {reg.mean():+.3f} | "
+        print(f"\n{nm} vs best non-LLM (balanced acc): n={len(reg)} | mean regret {reg.mean():+.3f} | "
               f"worst {reg.max():+.3f} | within .05: {int((reg<=.05).sum())}/{len(reg)} | "
               f">classical: {int((np.array(beat_cl)>0).sum())}/{len(reg)} | "
               f"subst.worse(>.10): {int((reg>.10).sum())}/{len(reg)}")
+print(f"\ndomains: {sorted(set(r[0] for r in rows))}")
