@@ -1,0 +1,79 @@
+[
+{
+"model": "haiku",
+"arm": "raw",
+"mean": 0.7866666666666666,
+"std": 0.10022197585581942,
+"nseed": 5
+},
+{
+"model": "haiku",
+"arm": "raw_perm",
+"mean": 0.3866666666666666,
+"std": 0.03399346342395192,
+"nseed": 5
+},
+{
+"model": "haiku",
+"arm": "verbal_anon",
+"mean": 0.8666666666666668,
+"std": 0.036514837167011066,
+"nseed": 5
+},
+{
+"model": "opus",
+"arm": "raw",
+"mean": 0.9533333333333334,
+"std": 0.02666666666666666,
+"nseed": 5
+},
+{
+"model": "opus",
+"arm": "raw_perm",
+"mean": 0.5533333333333333,
+"std": 0.08589399151150082,
+"nseed": 5
+},
+{
+"model": "opus",
+"arm": "counts_only",
+"mean": 0.7066666666666667,
+"std": 0.1878533707147383,
+"nseed": 5
+},
+{
+"model": "opus",
+"arm": "verbal",
+"mean": 0.9199999999999999,
+"std": 0.03399346342395189,
+"nseed": 5
+},
+{
+"model": "opus",
+"arm": "verbal_anon",
+"mean": 0.9400000000000001,
+"std": 0.038873012632301994,
+"nseed": 5
+},
+{
+"model": "sonnet",
+"arm": "raw",
+"mean": 0.9400000000000001,
+"std": 0.04422166387140532,
+"nseed": 5
+},
+{
+"model": "sonnet",
+"arm": "raw_perm",
+"mean": 0.62,
+"std": 0.10456258094238749,
+"nseed": 5
+},
+{
+"model": "sonnet",
+"arm": "verbal_anon",
+"mean": 0.9066666666666666,
+"std": 0.04898979485566355,
+"nseed": 5
+}
+]
