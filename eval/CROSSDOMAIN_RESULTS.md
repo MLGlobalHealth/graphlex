@@ -176,3 +176,12 @@ apply chemistry to. But it did **not** push graphlex+LLM above classical (0.867)
 consistent with the main finding that classical+logreg wins supervised molecular
 classification. (n=3, within noise.) The rings/bonds features are general
 NetworkX (now in the toolkit), so other domains get them too.
+
+### v3 cross-domain re-run with rings+bonds in the LLM prompt
+Re-ran all 3 domains with the substructure-enriched verbalization fed to the LLM
+(classical FKEYS unchanged, so classical/FM numbers identical to v2). graphlex+LLM:
+IMDB 0.658, PROTEINS 0.625, **NCI1 0.608**. The bonds/rings **helped chemistry**:
+NCI1 LLM 0.567→0.608, now **above classical (0.558) and the best FM (0.583)** — the
+LLM is the best method on the chemistry cell once it sees the wiring. Social/bio
+moved within noise. Net: still classical-wins-or-ties on social+bio, LLM-best on
+chemistry; the flexibility-vs-FMs picture is unchanged.
