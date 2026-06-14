@@ -72,7 +72,14 @@ def facts(G, node_attrs=None):
     deg = [d for _, d in G.degree()]
     mean_deg = float(np.mean(deg)) if deg else 0.0
     comms = _communities(G)
-    bc = nx.betweenness_centrality(G) if n > 2 else {v: 0.0 for v in G}
+    # Betweenness is only consumed by the structure x attributes section, so compute
+    # it lazily (skip entirely when no node_attrs). For large graphs use a fixed-seed
+    # k-sample approximation to stay cheap while remaining deterministic.
+    if node_attrs and n > 2:
+        bc = (nx.betweenness_centrality(G) if n <= 400
+              else nx.betweenness_centrality(G, k=min(100, n), seed=0))
+    else:
+        bc = {v: 0.0 for v in G}
 
     try:
         assort = float(nx.degree_assortativity_coefficient(G)) if m > 0 else float("nan")

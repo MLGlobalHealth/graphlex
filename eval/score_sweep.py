@@ -1,0 +1,62 @@
+"""Score the broad cross-domain sweep: graphlex+LLM (Qwen all-seeds, Opus subset)
+vs classical+logreg vs majority, per dataset, grouped by domain, with regret vs the
+best non-LLM baseline (classical/majority). Reports a flexibility summary."""
+import os, re, json, glob
+import numpy as np
+
+B = '/home/scratch/bench_out/sweep'
+man = json.load(open(f"{B}/manifest.json"))
+LINE = re.compile(r'^\s*(\d+)\s+([A-Za-z0-9_]+)\s*$')
+
+
+def parse(p):
+    d = {}
+    for ln in open(p):
+        m = LINE.match(ln.strip())
+        if m:
+            d[int(m.group(1))] = m.group(2).strip().upper()
+    return d
+
+
+def llm(ds, model):
+    accs = []
+    for fn, meta in man['files'].items():
+        if meta['dataset'] != ds:
+            continue
+        a = f"{B}/{ds}/ans/{model}/seed{meta['seed']}.ans"
+        if not os.path.exists(a):
+            continue
+        pred = parse(a)
+        tt = {i: str(l).upper() for i, l in meta['truth']}
+        if pred:
+            accs.append(sum(1 for i, l in tt.items() if pred.get(i) == l) / len(tt))
+    return accs
+
+
+rows = []
+for ds, meta in sorted(man['meta'].items(), key=lambda kv: (kv[1]['domain'], kv[0])):
+    b = man['baselines'][ds]
+    cl, mj = b['classical'][0], b['majority'][0]
+    qw = llm(ds, 'qwen'); op = llm(ds, 'opus')
+    rows.append((meta['domain'], ds, meta['chance'], cl, mj,
+                 np.mean(qw) if qw else None, np.mean(op) if op else None))
+
+hdr = f"{'domain':12} {'dataset':16} {'chance':>7} {'classical':>9} {'major':>7} {'Qwen14b':>8} {'Opus':>7} {'Qregret':>8}"
+print(hdr); print('-' * len(hdr))
+qreg = []
+for dom, ds, ch, cl, mj, qw, op in rows:
+    best = max(cl, mj)  # best non-LLM baseline
+    qr = (best - qw) if qw is not None else None
+    if qr is not None:
+        qreg.append(qr)
+    f = lambda x: f"{x:.3f}" if x is not None else "   -"
+    qrs = f"{qr:+.3f}" if qr is not None else "   -"
+    print(f"{dom:12} {ds:16} {ch:7.3f} {cl:9.3f} {mj:7.3f} {f(qw):>8} {f(op):>7} {qrs:>8}")
+
+print("\n=== flexibility summary (Qwen-14b vs best non-LLM baseline) ===")
+if qreg:
+    qreg = np.array(qreg)
+    print(f"datasets scored: {len(qreg)} across {len(set(r[0] for r in rows))} domains")
+    print(f"mean regret {qreg.mean():+.3f} | median {np.median(qreg):+.3f} | "
+          f"worst {qreg.max():+.3f} | Qwen >= baseline-0.05 on "
+          f"{int((qreg <= 0.05).sum())}/{len(qreg)} datasets")
