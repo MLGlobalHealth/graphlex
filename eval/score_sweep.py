@@ -1,22 +1,13 @@
 """Score the broad cross-domain sweep: graphlex+LLM (Qwen all-seeds, Opus subset)
 vs classical+logreg vs majority, per dataset, grouped by domain, with regret vs the
 best non-LLM baseline (classical/majority). Reports a flexibility summary."""
-import os, re, json, glob
+import os, sys, json, glob
 import numpy as np
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _common import parse_ans as parse
 
 B = '/home/scratch/bench_out/sweep'
 man = json.load(open(f"{B}/manifest.json"))
-# tolerant: handles "0 CLASS0", "Query 0 CLASS0", "0: CLASS0", "0) CLASS0"
-LINE = re.compile(r'^\s*(?:query\s*)?(\d+)\s*[:.\)\-]?\s+([A-Za-z0-9_]+)\s*$', re.I)
-
-
-def parse(p):
-    d = {}
-    for ln in open(p):
-        m = LINE.match(ln.strip())
-        if m:
-            d[int(m.group(1))] = m.group(2).strip().upper()
-    return d
 
 
 def llm(ds, model):

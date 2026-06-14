@@ -24,7 +24,6 @@ The expensive sweep recomputation is cached to figures/_sweep_cache.json; pass
 --refresh to force recomputation.
 """
 import os
-import re
 import sys
 import json
 import argparse
@@ -53,30 +52,9 @@ os.makedirs(FIGDIR, exist_ok=True)
 DOMAIN_ORDER = ["chemistry", "biology", "neuroscience", "social",
                 "vision", "synthetic", "citation", "archaeology"]
 
-# Answer-line parser (shared format across all three experiments).
-LINE = re.compile(r"^\s*(?:query\s*)?(\d+)\s*[:.\)\-]?\s+([A-Za-z0-9_]+)\s*$", re.I)
-
-
-def parse_ans(path):
-    """Parse an .ans file: int query id -> UPPER token."""
-    d = {}
-    with open(path) as fh:
-        for ln in fh:
-            m = LINE.match(ln.strip())
-            if m:
-                d[int(m.group(1))] = m.group(2).strip().upper()
-    return d
-
-
-def bal_acc(truth_list, pred_map):
-    """Macro-averaged per-class recall (== balanced accuracy)."""
-    by = {}
-    for i, lab in truth_list:
-        by.setdefault(str(lab).upper(), []).append(i)
-    recs = []
-    for lab, ids in by.items():
-        recs.append(np.mean([pred_map.get(i) == lab for i in ids]))
-    return float(np.mean(recs)) if recs else None
+# Shared answer-line parser + balanced-accuracy metric (see eval/_common.py).
+sys.path.insert(0, EVAL)
+from _common import parse_ans, bal_acc  # noqa: E402
 
 
 # ===========================================================================

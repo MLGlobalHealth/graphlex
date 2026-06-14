@@ -3,32 +3,18 @@
 Answer files: one line per query, '<id> <TOKEN>' (robust regex parse).
 Reports per-(model,arm) mean accuracy +/- std across seeds, plus logreg ref.
 """
-import os, re, json, glob
+import os, sys, json, glob
 import numpy as np
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _common import parse_ans as parse, raw_acc
 
 BASE = '/home/scratch/bench_out/synth_v2'
 man = json.load(open(f"{BASE}/manifest.json"))
 chance = man["chance"]
 
-LINE = re.compile(r'^\s*(\d+)\s+([A-Za-z]+)\s*$')
-
-
-def parse(path):
-    out = {}
-    for ln in open(path):
-        m = LINE.match(ln.strip())
-        if m:
-            out[int(m.group(1))] = m.group(2).strip().upper()
-    return out
-
 
 def score_file(ansfile, truth):
-    pred = parse(ansfile)
-    tt = {i: t.upper() for i, t in truth}
-    if not pred:
-        return None
-    correct = sum(1 for i, lab in tt.items() if pred.get(i) == lab)
-    return correct / len(tt)
+    return raw_acc(truth, parse(ansfile))
 
 
 # discover models = subdirs of ans/

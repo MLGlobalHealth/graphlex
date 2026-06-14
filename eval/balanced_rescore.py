@@ -8,7 +8,7 @@ no base-rate signal). Balanced accuracy removes that artifact: majority -> chanc
 Replays sweep.py's deterministic splits to recompute classical + majority preds,
 and reads the existing LLM answer files. No prompt regeneration / no LLM re-runs.
 """
-import os, re, sys, json
+import os, sys, json
 import numpy as np
 import networkx as nx
 from sklearn.linear_model import LogisticRegression
@@ -16,32 +16,11 @@ from sklearn.preprocessing import StandardScaler
 from torch_geometric.datasets import TUDataset
 sys.path.insert(0, '/home/scratch/Dropbox/Seth/Research/MLGHrepos/graphlex')
 sys.path.insert(0, '/home/scratch/Dropbox/Seth/Research/MLGHrepos/graphlex/eval')
-from sweep import (fvec, node_cats, to_nx, comp, SEEDS, SHOTS_PER_CLASS, MAX_SHOTS,
-                   NQ, POOL_CAP, TU_ROOT, OUT)
+from _common import parse_ans as parse, bal_acc, fvec, node_cats, to_nx, comp
+from sweep import (SEEDS, SHOTS_PER_CLASS, MAX_SHOTS, NQ, POOL_CAP, TU_ROOT, OUT)
 from graphlex import facts
 
 man = json.load(open(f"{OUT}/manifest.json"))
-LINE = re.compile(r'^\s*(?:query\s*)?(\d+)\s*[:.\)\-]?\s+([A-Za-z0-9_]+)\s*$', re.I)
-
-
-def parse(p):
-    d = {}
-    for ln in open(p):
-        m = LINE.match(ln.strip())
-        if m:
-            d[int(m.group(1))] = m.group(2).strip().upper()
-    return d
-
-
-def bal_acc(truth_list, pred_map):
-    """macro-averaged recall over true classes; pred_map int->TOKEN(upper)."""
-    by = {}
-    for i, lab in truth_list:
-        by.setdefault(str(lab).upper(), []).append(i)
-    recs = []
-    for lab, ids in by.items():
-        recs.append(np.mean([pred_map.get(i) == lab for i in ids]))
-    return float(np.mean(recs)) if recs else None
 
 
 def splits(name):

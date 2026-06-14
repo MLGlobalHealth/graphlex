@@ -1,21 +1,13 @@
 """Score the hardened label-efficiency crossover: graphlex+LLM (Opus + Qwen) vs
 logreg, per domain, with mean +/- std across seeds. Reads the manifest for truth +
 logreg curves; reads ans/<model>/seed*_k*.ans for each model."""
-import os, re, json, glob
+import os, sys, json, glob
 import numpy as np
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _common import parse_ans as parse
 
 B = '/home/scratch/bench_out/labelcurve'
 man = json.load(open(f"{B}/manifest.json"))
-LINE = re.compile(r'^\s*(\d+)\s+([A-Za-z0-9_]+)\s*$')
-
-
-def parse(p):
-    d = {}
-    for ln in open(p):
-        m = LINE.match(ln.strip())
-        if m:
-            d[int(m.group(1))] = m.group(2).strip().upper()
-    return d
 
 
 def llm_scores(tname, model):
