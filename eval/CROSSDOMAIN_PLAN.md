@@ -88,6 +88,16 @@ per-task tuning beyond the shots in context.
    (MUTAG, PROTEINS or ENZYMES, IMDB-BINARY) — graphlex-verbalize+Claude vs
    logreg+GIN+majority. Proves the harness, first cross-domain regret numbers.
 2. Batch 2: Task D (structure-vs-null) across domains — graphlex's native strength.
+   **LEAKAGE WARNING (verified in Jess's baseline.py + stats.py):** for
+   structure-as-finding / structural-property targets, logreg-on-structural-features
+   reads the answer off its own input — `NetworkStatsEncoder` is documented to score
+   R²=1.000 on exactly these probe targets, and synth family-ID logreg already hit
+   0.92 for the same reason. So in batch 2 a trained logreg is NOT a weak baseline
+   and "logreg can't do it" is FALSE. graphlex+LLM's honest, *capability* edge here
+   is **zero labels** (logreg must be trained; the verbalize→null-model→LLM pipeline
+   needs none) + interpretable null-model reasoning — not a margin win. Design batch 2
+   as: LLM at 0/1-shot vs logreg across the label curve; never present a
+   self-leaking trained logreg as something the LLM "beats".
 3. Batch 3: Tasks B & C (node / link) across domains.
 4. Add domains 4–6; add a non-Claude model; leakage controls.
 5. Assemble the regret heatmap; decide PNAS-main readiness.

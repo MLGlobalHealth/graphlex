@@ -7,6 +7,18 @@ pure-ICL subagents (2 tool uses each, verified). Classical and LLM consume the
 **identical** `graphlex.facts()` (vector vs prose); FM embeddings are precomputed on
 the same real graphs (`/home/scratch/real_fm_embeddings/`).
 
+> **What "classical" is here:** logreg on the 14-d `graphlex.facts()` vector — a
+> NetworkStats-*equivalent*, NOT Jess's `NetworkStatsEncoder` itself. Verified
+> faithful: on identical 12-shot splits, my facts-logreg vs Jess's actual
+> `NetworkStatsEncoder`-logreg = IMDB 0.675/0.625, PROTEINS 0.692/0.625, NCI1
+> 0.558/0.583 — within ~0.07 (seed noise); the parity conclusion holds with either
+> (Jess's is slightly weaker at low-label, so graphlex+LLM *edges* her classical on
+> IMDB/PROTEINS). **No bug invalidates the classical baseline for classification:**
+> the class label is not a structural-stat input, so there is no self-leakage. (The
+> documented R²=1.000 self-leakage of `NetworkStatsEncoder` is real but scoped to
+> structural-*property probe* tasks where the target equals an input column — see
+> the batch-2 warning in CROSSDOMAIN_PLAN.md; it does not affect classification.)
+
 > Fairness note: graphlex+LLM and `classical` are **structure-only**; the FM
 > embeddings (graphpfn/gmn) were computed **with node features** (atom types for
 > NCI1, residues for PROTEINS). So on bio/chem the FMs have a feature advantage that
