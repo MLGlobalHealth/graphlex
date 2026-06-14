@@ -96,16 +96,24 @@ classes → skipped; COIL-DEL 100-class and REDDIT-MULTI-5K also skipped.) DBLP'
 41k-dim bag-of-words features exceed the composition cap → structure-only. Opus now
 covers all 30 (seed 11; + seeds 22/33 on 6 domain reps). Balanced accuracy:
 
-### FINAL — full 3-seed Opus on all 30 (the publishable aggregate)
+### FINAL — full 3-seed, complete coverage, all 4 methods on all 30 (the publishable aggregate)
 | model | n | seeds | mean regret | worst | within 0.05 | beats classical | subst. worse (>0.10) |
 |---|---|---|---|---|---|---|---|
 | **Opus** | 30 | 3 | **−0.016** (ahead) | **+0.099** | **25/30** | 18/30 | **0/30** |
-| Qwen-14B | 21 | 3 | −0.000 | +0.144 | 17/21 | 13/21 | 3/21 |
-| Qwen-32B-q4 | 27 | 3 | +0.021 | +0.182 | 16/27 | 12/27 | 6/27 |
+| Qwen-32B-q4 | 29 | 3 | +0.026 | +0.182 | 17/29 | 12/29 | 7/29 |
+| Qwen-14B | 30 | 3 | +0.045 | +0.471 | 18/30 | 14/30 | 5/30 |
+
+(Qwen now complete across all 30: format failures recovered with a strict-format
+re-prompt + 5 new datasets covered. The 29 for Qwen-32B excludes one still-unparseable
+many-class cell.)
 
 **With full multi-seed, Opus is NEVER substantially worse (0/30), ahead of the best
 classical baseline on average (−0.016), within 0.05 on 25/30, and wins outright on
-18/30 — across 8 sciences.** This is the clean, robust flexibility result.
+18/30 — across 8 sciences. This "ahead + never substantially worse" property is
+FRONTIER-SPECIFIC:** the open models are roughly baseline-level (Qwen-32B +0.026,
+Qwen-14B +0.045) and DO take several substantial losses (7/29 and 5/30) — consistent
+with the capability ladder. So the headline flexibility claim must be scoped to a
+frontier model; open models are competitive-on-average but not uniformly safe.
 
 > **Critical lesson: single-seed Opus was misleadingly pessimistic.** The "3
 > failures" reported at 1 seed were ALL artifacts of which graphs landed in the tiny
