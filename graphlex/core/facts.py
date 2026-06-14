@@ -90,6 +90,9 @@ def facts(G, node_attrs=None):
         if not vals:
             continue
         groups = sorted({str(v) for v in vals.values()})
+        comp_counts = Counter(str(v) for v in vals.values())
+        total_attr = sum(comp_counts.values())
+        composition = {g: comp_counts[g] / total_attr for g in groups} if total_attr else {}
         try:
             assort = float(nx.attribute_assortativity_coefficient(G, attr))
         except Exception:
@@ -99,6 +102,7 @@ def facts(G, node_attrs=None):
         mean_bc = {g: (float(np.mean(by_group[g])) if by_group[g] else 0.0) for g in groups}
         out["attributes"][attr] = {
             "groups": groups,
+            "composition": composition,
             "assortativity": assort,
             "within_edges": m - len(cross_edges),
             "cross_edges": len(cross_edges),

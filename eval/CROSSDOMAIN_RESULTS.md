@@ -76,3 +76,50 @@ the same real graphs (`/home/scratch/real_fm_embeddings/`).
   <~0.05 as ties. The NCI1 "LLM wins" is in a near-chance regime — don't over-read.
 - Structure-only for graphlex/classical; FMs use node features.
 - Single LLM family (Claude/Opus).
+
+---
+
+## UPDATE — v2: node features given to graphlex+LLM AND classical (fairness fix)
+
+Batch 1 unfairly withheld node features (atom/residue types) from graphlex+LLM and
+classical while the FMs used them. Fixed: added node-attribute **composition** to
+`facts()`/`verbalize()` (top-k group fractions, deterministic) so the LLM sees it,
+and appended the category-fraction vector to the classical features. IMDB has no
+node features (unchanged). Harness: `crossdomain_graphcls.py` (OUT=crossdom_v2).
+
+| domain | graphlex+LLM | classical | graphpfn | gmn | kumorfm | best spec | regret |
+|---|---|---|---|---|---|---|---|
+| social (IMDB) | 0.608 | **0.675** | 0.575 | 0.667 | 0.592 | 0.675 | +0.067 |
+| biology (PROTEINS) | 0.667 | **0.742** | 0.742 | 0.725 | – | 0.742 | +0.075 |
+| chemistry (NCI1) | 0.567 | 0.558 | **0.583** | 0.508 | – | 0.583 | +0.017 |
+
+**Worst-case regret (flexibility score):** classical **0.025** · graphlex+LLM 0.075 ·
+gmn 0.075 · kumorfm 0.083 (1/3) · graphpfn 0.100 · majority 0.175.
+
+### What changed and what it means (honest)
+1. **Node features did NOT help the LLM** (PROTEINS 0.667 unchanged; NCI1 ~flat;
+   IMDB 0.642→0.608 is pure ICL sampling noise — identical input, different draw).
+   Single-draw ICL noise is ~±0.03–0.04/cell at 3 seeds; **margins <0.05 are ties.**
+2. **Node features helped the CLASSICAL arm** (PROTEINS 0.692→0.742), making
+   **classical NetworkX+logreg the most flexible & effective method here**
+   (max-regret 0.025). graphlex+LLM no longer ties it — it slightly trails.
+3. **graphlex+LLM is still flexible and never substantially worse** (max-regret
+   0.075, within noise of gmn) and still beats every FM on coverage/worst-case
+   (graphpfn breaks on social, gmn on chemistry, kumorfm covers 1/3). The
+   flexibility-**vs-FMs** story survives.
+
+### The headline consequence (decision-relevant)
+On **supervised graph classification, classical+logreg wins the flexibility race** —
+graphlex+LLM ties the FMs but not the classical baseline. So "graphlex+LLM is the
+MOST flexible & effective approach to AI on graphs" **cannot be carried by
+classification accuracy.** It must be carried by the **task types classical+logreg
+structurally cannot do**: zero-/few-label (no training), interpretable
+natural-language output, mixed text+structure, and one unified interface across
+many task types. That makes **batch 2 (zero-label structure-as-finding vs a null
+model)** the load-bearing experiment — and per the leakage warning in
+CROSSDOMAIN_PLAN.md, the comparison there must be LLM-at-0/1-shot vs logreg-across-
+the-label-curve, never a self-leaking trained logreg.
+
+### Still needed to harden this
+- More seeds (3→≥8) and multiple ICL draws per cell to convert "ties" into CIs.
+- ≥1 non-Claude model.

@@ -29,7 +29,7 @@ from graphlex import facts, verbalize
 
 TU_ROOT = '/home/scratch/tudata'
 EMB_DIR = '/home/scratch/real_fm_embeddings'
-OUT = '/home/scratch/bench_out/crossdom'
+OUT = '/home/scratch/bench_out/crossdom_v2'   # v2: node features given to LLM + classical
 SEEDS = [11, 22, 33]
 SHOTS_PER_CLASS = 12
 N_QUERY = 40
@@ -46,10 +46,33 @@ FKEYS = ['n_nodes', 'n_edges', 'density', 'n_components', 'mean_degree', 'max_de
          'degree_assortativity', 'avg_path_length', 'diameter', 'n_communities']
 
 
-def to_nx(data):
+def node_categories(data):
+    """Argmax category per node for one-hot categorical node features, else None."""
+    x = data.x
+    if x is None:
+        return None, 0
+    import numpy as _np
+    xs = x.numpy()
+    rowsums = xs.sum(1)
+    if not (_np.allclose(rowsums, 1) and set(_np.unique(xs).tolist()) <= {0.0, 1.0}):
+        return None, 0            # not clean one-hot; skip (keep structure-only)
+    return xs.argmax(1), xs.shape[1]
+
+
+def to_nx(data, cats=None):
     G = to_networkx(data, to_undirected=True)
     G.remove_edges_from(nx.selfloop_edges(G))
+    if cats is not None:
+        nx.set_node_attributes(G, {i: f"t{int(cats[i])}" for i in G.nodes()}, "type")
     return G
+
+
+def composition_vec(cats, ncat):
+    """Fixed-length category-fraction vector (bag of node types) for the classical arm."""
+    if cats is None or ncat == 0:
+        return []
+    v = np.bincount(cats, minlength=ncat).astype(float)
+    return (v / v.sum()).tolist() if v.sum() else v.tolist()
 
 
 def feat_vec(f):
@@ -112,15 +135,25 @@ def run_dataset(name, domain, key, encoders):
         q_pos = q_pos[:N_QUERY]
         rng.shuffle(shot_pos)
 
-        # graphlex facts/verbalize for selected graphs
-        def G_of(j):
-            return to_nx(ds[idx[j]])
-        fcache = {j: facts(G_of(j)) for j in set(shot_pos + q_pos)}
+        # graphlex facts/verbalize for selected graphs (with node features if present)
+        used = set(shot_pos + q_pos)
+        cats_cache, ncat = {}, 0
+        for j in used:
+            c, nc = node_categories(ds[idx[j]])
+            cats_cache[j] = c
+            ncat = max(ncat, nc)
+        has_attr = any(cats_cache[j] is not None for j in used)
+        node_attrs = ['type'] if has_attr else []
+        fcache = {j: facts(to_nx(ds[idx[j]], cats_cache[j]), node_attrs=node_attrs)
+                  for j in used}
+
+        def fullfeat(j):
+            return feat_vec(fcache[j]) + composition_vec(cats_cache[j], ncat)
 
         # ---- baselines at this split ----
-        Xs = np.array([feat_vec(fcache[j]) for j in shot_pos])
+        Xs = np.array([fullfeat(j) for j in shot_pos])
         ys = y[shot_pos]
-        Xq = np.array([feat_vec(fcache[j]) for j in q_pos])
+        Xq = np.array([fullfeat(j) for j in q_pos])
         yq = y[q_pos]
         per_seed_base['classical'].append(logreg_acc(Xs, ys, Xq, yq))
         maj = np.bincount(ys).argmax()
@@ -137,13 +170,14 @@ def run_dataset(name, domain, key, encoders):
                 f"The classes differ in structural properties. Learn the pattern from the "
                 f"labeled examples, then classify each query.\nOUTPUT FORMAT: one line per "
                 f"query, exactly '<id> <CLASS>' (e.g. '0 {cls_name[classes[0]]}'). No other text.")
+        vfocus = 'all' if has_attr else 'structure'
         L = [TASK, "", "=== LABELED EXAMPLES ==="]
         for j in shot_pos:
-            L.append(f"[{cls_name[y[j]]}]\n{verbalize(fcache[j], focus='structure')}\n")
+            L.append(f"[{cls_name[y[j]]}]\n{verbalize(fcache[j], focus=vfocus)}\n")
         L.append("=== QUERIES (classify each) ===")
         truth = []
         for qi, j in enumerate(q_pos):
-            L.append(f"Query {qi}:\n{verbalize(fcache[j], focus='structure')}\n")
+            L.append(f"Query {qi}:\n{verbalize(fcache[j], focus=vfocus)}\n")
             truth.append([qi, cls_name[int(y[j])]])
         fn = f"{name}/seed{seed}.txt"
         open(f"{OUT}/{fn}", 'w').write("\n".join(L))

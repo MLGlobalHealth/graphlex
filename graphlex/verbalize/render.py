@@ -38,9 +38,23 @@ def _structure(f):
     return out
 
 
+def _composition_phrase(comp, attr, k=8):
+    """Top-k group fractions, descending then alphabetical; rest folded into 'other'."""
+    items = sorted(comp.items(), key=lambda kv: (-kv[1], kv[0]))
+    head = items[:k]
+    shown = ", ".join(f"{g} {p*100:.0f}%" for g, p in head)
+    rest = sum(p for _, p in items[k:])
+    if rest > 0:
+        shown += f", other {rest*100:.0f}%"
+    return f"Node composition by {attr} ({len(comp)} groups): {shown}."
+
+
 def _attribute(f, attr, a):
-    sent = [f"Ties are {homophily_word(a['assortativity'])} on {attr} "
-            f"(assortativity {a['assortativity']:.2f})."]
+    sent = []
+    if a.get("composition"):
+        sent.append(_composition_phrase(a["composition"], attr))
+    sent.append(f"Ties are {homophily_word(a['assortativity'])} on {attr} "
+                f"(assortativity {a['assortativity']:.2f}).")
 
     ncomm = f["structure"]["n_communities"]
     if a["community_purity"] is not None and ncomm > 1:
