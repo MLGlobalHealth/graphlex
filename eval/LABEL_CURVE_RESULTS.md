@@ -113,5 +113,29 @@ temp 0). Opus anchored at 3 seeds; Qwen + logreg at 8 seeds. **This revises the
 to *frontier-model + prior-rich task* and stated with the model-capability
 dependence shown explicitly. The broad, safe claim remains the **zero-label
 capability** (logreg can't run at all) + flexibility; the *beats-logreg-with-labels*
-claim is a narrower, capability-gated result. Pending: Qwen-32B on family to test
-whether scale (not Claude-ness) recovers the win.
+claim is a narrower, capability-gated result.
+
+### Capability ladder — Qwen-32B added (it IS model scale, not Claude-specific)
+Qwen2.5-32B-Instruct-q4 (8 seeds, clpc35) on family:
+
+| k | Opus | Qwen-32B | logreg | Qwen-14B |
+|---|---|---|---|---|
+| 1 | **0.878** | **0.662** | 0.567 | 0.521 |
+| 3 | 0.900 | 0.729 | 0.804 | 0.658 |
+| 5 | 0.922 | 0.792 | 0.887 | 0.708 |
+
+- **The low-label win scales monotonically with model capability.** At k=1:
+  Opus (0.878) ≫ Qwen-32B (0.662) > logreg (0.567) > Qwen-14B (0.521). Scaling
+  14B→32B *recovers* a k=1 win over logreg that 14B lacked → the effect is **model
+  capability, NOT Opus-specific.**
+- **But for non-frontier models the win is fragile:** Qwen-32B beats logreg only at
+  k=1; by k=3,5 logreg overtakes it (0.804/0.887 vs 0.729/0.792). Only the frontier
+  model (Opus) stays above logreg across k=1–5.
+
+**Refined paper claim (clean + honest):** *On prior-rich tasks in the low-label
+regime, graphlex+LLM beats trained logreg, and the margin scales with model
+capability — frontier models win across the low-label regime; a mid-size open model
+(32B) wins only at the extreme low end (k=1); a small model (14B) does not.* This
+is a capability-axis result (an existence ladder), not a single-model anecdote.
+Still domain-gated: holds on family (network-science prior), washes out near chance
+on structure-only PROTEINS/IMDB.
