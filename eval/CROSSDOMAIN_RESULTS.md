@@ -123,3 +123,35 @@ the-label-curve, never a self-leaking trained logreg.
 ### Still needed to harden this
 - More seeds (3→≥8) and multiple ICL draws per cell to convert "ties" into CIs.
 - ≥1 non-Claude model.
+
+---
+
+## SIDE-TEST — real element names vs opaque type ids (MUTAG)
+Question (raised by Seth): does giving the LLM the *actual* elements ("Carbon",
+"Oxygen") instead of opaque "t0/t1" help, since the LLM knows chemistry? NCI1 ships
+integer labels with **no element legend** (README confirms), so it can't be named
+without risking wrong chemistry. MUTAG has the canonical mapping (0=C,1=N,2=O,3=F,
+4=I,5=Cl,6=Br; verified: Carbon is the dominant atom). Two arms differ ONLY in
+naming. Harness: `eval/mutag_elements.py`. 10-shot/class, 40 q, 3 seeds, Opus.
+
+| method | acc |
+|---|---|
+| classical (facts + atom composition) | 0.867 ± 0.051 |
+| graphlex+LLM, **opaque** "t0/t1…" | 0.833 ± 0.062 |
+| graphlex+LLM, **real elements** | 0.725 ± 0.061 |
+| majority | 0.342 |
+
+**Δ(elem − opaque) = −0.108** (per-seed elem−opaque: −0.25, +0.05, −0.125).
+**Real element names did NOT help — they hurt** (opaque better in 2/3 seeds).
+Caveats: n=3, single ICL draw → underpowered; the delta exceeds the std but is not
+significant. Plausible mechanism (speculative): real names **activate chemistry
+priors** the model then over-applies, but the verbalization gives only atom
+*composition* (a bag of atoms), not the **bonding/substructure** needed to apply
+those priors correctly (mutagenicity comes from functional groups like nitro/
+aromatic rings, not atom counts) — so the prior misleads. Opaque labels force the
+model to learn purely from the in-context pattern, which generalizes better here.
+This echoes the synth anonymization result (priors are a double-edged sword) and
+reinforces that **the real attribute lever is typed *substructure*, not naming**.
+Both LLM arms still sit at/below classical (0.867) — consistent with the main
+finding. Revisit with more seeds + a substructure-aware verbalization before
+concluding.
