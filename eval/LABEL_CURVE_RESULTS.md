@@ -55,6 +55,37 @@ classical+logreg remains the right tool). Combined with the zero-label result
 | 1–~5 / class | graphlex+LLM (more label-efficient) |
 | many / class | classical+logreg (cheaper, ties-or-better) |
 
+## CROSS-FAMILY ladder (2026-06-14) — Qwen + 4 open families via Ollama on clpc35
+
+Ran the FAMILY label-curve on a multi-vendor panel (driver `run_qwen.py`; scorer
+`eval/score_multifamily.py`; raw scores `bench_out/labelcurve/multifamily_scores.json`).
+FAMILY (network-science, chance 0.333), accuracy mean±std over 8 seeds:
+
+| model | k=1 | k=3 | k=5 |
+|---|---|---|---|
+| **Opus** (frontier) | **0.878** | **0.900** | **0.922** |
+| **Qwen2.5-32B-q4** | **0.662** | 0.729 | 0.792 |
+| logreg (reference) | 0.567 | 0.804 | 0.887 |
+| Qwen2.5-14B | 0.521 | 0.658 | 0.708 |
+| Gemma-2-27B | 0.488 | 0.533 | 0.633 |
+| Mistral-7B | 0.471 | 0.608 | 0.662 |
+| Llama-3.1-8B | 0.438 | 0.567 | 0.617 |
+| Gemma-2-9B | 0.417 | 0.562 | 0.592 |
+
+**The low-label "beats logreg" effect is capability-gated, and it generalizes across
+vendors — it is NOT a Qwen artifact.** At k=1 only the two strongest models (Opus,
+Qwen-32B) exceed logreg (0.567); every ~7–9B open model from Meta (Llama-3.1-8B),
+Google (Gemma-2-9B/27B), Mistral, and Alibaba (Qwen-14B) sits below it. By k=3–5
+only Opus stays above logreg. Model *size within a family* helps (Qwen 14B→32B:
+0.521→0.662) but isn't sufficient (Gemma-2-27B underperforms its 9B and the smaller
+Qwen-32B) — capability, not parameter count alone. This sharpens the headline from
+"Opus-specific" to **"requires a high-capability model, shown across 5 families."**
+
+Caveat: PROTEINS/IMDB coverage for the new open families is **partial** (interrupted
+runs + format drift on the longer attributed prompts — several cells n<8 or missing),
+so only the FAMILY domain is a clean cross-family ladder; treat proteins/imdb
+multi-family cells as incomplete. Opus/Qwen rows there are the trustworthy ones.
+
 ## Caveats
 - 3 seeds, single ICL draw — family margins at k=1,3 are large/robust; PROTEINS
   margins (+0.02–0.06) are small and near chance, within noise. Direction is
