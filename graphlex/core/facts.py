@@ -66,7 +66,9 @@ def _ring_sizes(G, n, m):
     return dict(sorted(h.items()))
 
 
-def facts(G, node_attrs=None):
+def facts(G, node_attrs=None, nodes=True):
+    """nodes=True adds a per-node section (degree/betweenness/eigenvector + named
+    top-k); pass nodes=False for the cheap structure-only path (large sweeps)."""
     node_attrs = list(node_attrs or [])
     n, m = G.number_of_nodes(), G.number_of_edges()
     deg = [d for _, d in G.degree()]
@@ -75,7 +77,9 @@ def facts(G, node_attrs=None):
     # Betweenness is only consumed by the structure x attributes section, so compute
     # it lazily (skip entirely when no node_attrs). For large graphs use a fixed-seed
     # k-sample approximation to stay cheap while remaining deterministic.
-    if node_attrs and n > 2:
+    # betweenness feeds BOTH the node-level section and the structure x attributes
+    # section. Compute once; size-gated fixed-seed k-sample approx for large graphs.
+    if (nodes or node_attrs) and n > 2:
         bc = (nx.betweenness_centrality(G) if n <= 400
               else nx.betweenness_centrality(G, k=min(100, n), seed=0))
     else:
@@ -90,6 +94,30 @@ def facts(G, node_attrs=None):
     apl, diam = _path_stats(G, n)
     n_cycles = m - n + nx.number_connected_components(G) if n else 0   # cyclomatic number
     ring_sizes = _ring_sizes(G, n, m)
+
+    nodes_sec = None
+    if nodes:
+        deg_c = dict(G.degree())
+        try:
+            eig = (nx.eigenvector_centrality_numpy(G) if m > 0 else {v: 0.0 for v in G})
+            eig = {v: float(x) for v, x in eig.items()}
+        except Exception:
+            eig = {v: 0.0 for v in G}
+
+        def _topk(d, k=5):
+            return sorted(d, key=lambda x: d[x], reverse=True)[:k]
+
+        nodes_sec = {
+            "names": list(G.nodes()),
+            "degree": deg_c,
+            "betweenness": bc,
+            "eigenvector": eig,
+            "top_degree": _topk(deg_c),
+            "top_betweenness": _topk(bc),
+            "top_eigenvector": _topk(eig),
+            "min_degree_node": (min(deg_c, key=lambda x: deg_c[x]) if deg_c else None),
+            "n_isolates": int(sum(1 for x in deg_c.values() if x == 0)),
+        }
 
     out = {
         "structure": {
@@ -111,6 +139,7 @@ def facts(G, node_attrs=None):
             "n_communities": len(comms),
         },
         "attributes": {},
+        "nodes": nodes_sec,
         "_communities": comms,
     }
 

@@ -3,6 +3,7 @@
 Every sentence is a fixed template filled from exact numbers in `facts`; the only
 non-numeric choices come from graphlex.thresholds (versioned, inspectable).
 """
+import networkx as nx
 from ..thresholds import homophily_word, correspondence_word, CENTRALITY_RATIO
 
 
@@ -104,11 +105,56 @@ def _attribute(f, attr, a):
     return " ".join(sent)
 
 
+def _nodes(f):
+    """Named per-node highlights: top nodes by degree / betweenness / eigenvector,
+    plus isolates. Empty string when facts() was called with nodes=False."""
+    nd = f.get("nodes")
+    if not nd or not nd.get("degree"):
+        return ""
+    deg, bc, eig = nd["degree"], nd["betweenness"], nd["eigenvector"]
+    sent = ["Most connected: " + ", ".join(f"{v} (degree {deg[v]})" for v in nd["top_degree"]) + "."]
+    if any(x > 0 for x in bc.values()):
+        sent.append("Top brokers (betweenness): "
+                    + ", ".join(f"{v} ({bc[v]:.2f})" for v in nd["top_betweenness"]) + ".")
+    if any(x > 0 for x in eig.values()):
+        sent.append("Most central (eigenvector): "
+                    + ", ".join(f"{v} ({eig[v]:.2f})" for v in nd["top_eigenvector"]) + ".")
+    if nd.get("n_isolates"):
+        sent.append(f"{_p(nd['n_isolates'], 'isolated node')} (degree 0).")
+    return " ".join(sent)
+
+
+def verbalize_node(G, v):
+    """Deterministic description of a SINGLE node (by name/id). No LLM."""
+    if v not in G:
+        return f"Node {v!r} is not in the graph."
+    n = G.number_of_nodes()
+    deg = G.degree(v)
+    degs = dict(G.degree())
+    rank = 1 + sum(1 for u in degs if degs[u] > deg)
+    s = [f"Node '{v}': degree {deg} (rank {rank} of {n}), "
+         f"local clustering {nx.clustering(G, v):.2f}."]
+    if 2 < n <= 1500:
+        s.append(f"Betweenness {nx.betweenness_centrality(G).get(v, 0.0):.3f}.")
+    try:
+        s.append(f"Eigenvector centrality {nx.eigenvector_centrality_numpy(G).get(v, 0.0):.3f}.")
+    except Exception:
+        pass
+    nbrs = [str(u) for u in G.neighbors(v)]
+    shown = ", ".join(nbrs[:12]) + ("..." if len(nbrs) > 12 else "")
+    s.append(f"Neighbors ({len(nbrs)}): {shown}.")
+    return " ".join(s)
+
+
 def verbalize(facts, focus="all"):
-    """Render facts to text. focus in {'all','structure','attributes'}."""
+    """Render facts to text. focus in {'all','structure','nodes','attributes'}."""
     parts = []
     if focus in ("all", "structure"):
         parts.append(_structure(facts))
+    if focus in ("all", "nodes"):
+        nt = _nodes(facts)
+        if nt:
+            parts.append(nt)
     if focus in ("all", "attributes"):
         for attr, a in facts.get("attributes", {}).items():
             parts.append(_attribute(facts, attr, a))
