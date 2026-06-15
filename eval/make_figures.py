@@ -43,6 +43,7 @@ EVAL = os.path.join(REPO, "eval")
 FIGDIR = os.path.join(EVAL, "figures")
 SWEEP = "/home/scratch/bench_out/sweep"
 FM_REPR = "/home/scratch/bench_out/fm_repr"  # per-encoder FM-embedding+logreg arm
+GILT = "/home/scratch/bench_out/gilt"        # GILT native graph-ICL arm (#2)
 LABELCURVE = "/home/scratch/bench_out/labelcurve"
 ZEROLABEL = "/home/scratch/bench_out/zerolabel"
 CACHE = os.path.join(FIGDIR, "_sweep_cache.json")
@@ -73,6 +74,20 @@ def fm_repr_balacc(dataset, encoder="graphpfn"):
         return None
     res = json.load(open(p))
     m = res.get("mean", {}).get(encoder)
+    return float(m[0]) if m else None
+
+
+def gilt_balacc(dataset):
+    """Mean balanced accuracy of the GILT native-graph-ICL arm for one dataset.
+
+    Reads the per-dataset JSON written by eval/gilt_icl.py (same matched few-shot
+    splits + BALANCED accuracy, parity-asserted). None if missing -> hatched cell.
+    """
+    p = os.path.join(GILT, f"{dataset}.json")
+    if not os.path.exists(p):
+        return None
+    res = json.load(open(p))
+    m = res.get("mean", {}).get("gilt")
     return float(m[0]) if m else None
 
 
@@ -109,6 +124,7 @@ def compute_sweep_table(refresh=False):
             "qwen32": br.llm_balacc(ds, "qwen32"),
             "opus": br.llm_balacc(ds, "opus"),
             "graphpfn": fm_repr_balacc(ds, "graphpfn"),
+            "gilt": gilt_balacc(ds),
         })
     with open(CACHE, "w") as fh:
         json.dump(rows, fh, indent=2)
@@ -132,6 +148,7 @@ def _order_rows(rows):
 
 METHODS = [("classic", "Classical\n(logreg)"),
            ("graphpfn", "GraphPFN-embed\n(frozen+logreg)"),
+           ("gilt", "GILT\n(native graph-ICL)"),
            ("qwen14", "Qwen-14B"),
            ("qwen32", "Qwen-32B"),
            ("opus", "Opus")]
