@@ -123,6 +123,22 @@
 
     <div id="out" class="card hidden">
       <h2>2. Deterministic analysis (no LLM)</h2>
+      <details open style="margin:0 0 12px">
+        <summary>Feature groups to compute &amp; verbalize <span class="muted">(all on by default; toggling re-runs)</span></summary>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:5px 18px;margin-top:8px;font-size:0.9em">
+          <label><input type="checkbox" class="grp" value="A" checked onchange="run()"> <b>A. Size &amp; connectivity</b> <span class="muted">nodes, edges, density, components</span></label>
+          <label><input type="checkbox" class="grp" value="B" checked onchange="run()"> <b>B. Degree distribution</b> <span class="muted">mean, max, std, skewness, kurtosis, Gini, power-law exponent</span></label>
+          <label><input type="checkbox" class="grp" value="C" checked onchange="run()"> <b>C. Clustering &amp; cohesion</b> <span class="muted">avg clustering, transitivity, triangles, 4-cycles</span></label>
+          <label><input type="checkbox" class="grp" value="D" checked onchange="run()"> <b>D. Distances</b> <span class="muted">avg path length, diameter, radius</span></label>
+          <label><input type="checkbox" class="grp" value="E" checked onchange="run()"> <b>E. Mixing &amp; community</b> <span class="muted">degree assortativity, communities, modularity</span></label>
+          <label><input type="checkbox" class="grp" value="F" checked onchange="run()"> <b>F. Cores &amp; spectral</b> <span class="muted">degeneracy (max k-core), algebraic connectivity</span></label>
+          <label><input type="checkbox" class="grp" value="G" checked onchange="run()"> <b>G. Cycles</b> <span class="muted">independent cycles (cyclomatic)</span></label>
+          <label><input type="checkbox" class="grp" value="H" checked onchange="run()"> <b>H. Centrality summaries</b> <span class="muted">betweenness, closeness, eigenvector (mean/max)</span></label>
+          <label><input type="checkbox" class="grp" value="I" checked onchange="run()"> <b>I. Key nodes (named)</b> <span class="muted">top by degree, betweenness, eigenvector</span></label>
+          <label><input type="checkbox" class="grp" value="J" checked onchange="run()"> <b>J. Null-model contrasts</b> <span class="muted">clustering vs ER &amp; configuration model, small-world &sigma;/&omega;</span></label>
+          <label><input type="checkbox" class="grp" value="K" checked onchange="run()"> <b>K. Per-node detail &amp; relations</b> <span class="muted">each node's label, degree, centralities, community, neighbor list</span></label>
+        </div>
+      </details>
       <div class="results">
         <div>
           <div class="badge nx">NetworkX spring layout</div>
@@ -154,8 +170,102 @@
 <!-- The EXACT Python that runs in-browser (graphlex from the wheel). Non-executed
      script tag so backslashes/newlines survive verbatim. -->
 <script type="text/python" id="pycode">
-import json, networkx as nx
+import json, networkx as nx, numpy as np
 from graphlex import facts, verbalize
+
+# ---- webapp-local PREVIEW of the finalized facts() candidate features (FACTS_FEATURES.tex,
+# groups A-J). Computed in-browser with networkx/numpy/scipy; NOT the library wheel's
+# verbalize() (which is unchanged). Deterministic, no LLM. Groups toggled in the UI. ----
+def _gini(x):
+    x=np.sort(np.asarray(x,float)); nn=len(x)
+    if nn==0 or x.sum()==0: return 0.0
+    return float((2*np.sum((np.arange(1,nn+1))*x)/(nn*x.sum()))-(nn+1)/nn)
+
+def _topk(d,k=5):
+    return ", ".join(f"{v} ({d[v]:.3g})" for v in sorted(d,key=lambda x:d[x],reverse=True)[:k])
+
+PERNODE_CAP=50   # group K: list every node up to this many; else summarize
+
+def candidate_analyze(G, attr=None, enabled="ABCDEFGHIJK"):
+    """Return (prose, json-dict). Both respect the enabled-group set, so the
+    'raw facts() (JSON)' pane mirrors the verbalization exactly (option b)."""
+    E=set(enabled); txt=[]; D={}
+    n,m=G.number_of_nodes(),G.number_of_edges()
+    if n==0: return "Empty graph.", {}
+    deg=dict(G.degree()); dega=np.array([deg[v] for v in G],float)
+    dens=nx.density(G); ac=nx.average_clustering(G)
+    Gc=G.subgraph(max(nx.connected_components(G),key=len))
+    bc=nx.betweenness_centrality(G) if n>2 else {v:0.0 for v in G}
+    try: eig={v:float(x) for v,x in nx.eigenvector_centrality_numpy(G).items()} if m else {v:0.0 for v in G}
+    except Exception: eig={v:0.0 for v in G}
+    clo=nx.closeness_centrality(G)
+    comms=list(nx.community.greedy_modularity_communities(G)) if m else [set(G)]
+    node2c={v:i for i,c in enumerate(comms) for v in c}
+    if "A" in E:
+        D["A_size"]={"nodes":n,"edges":m,"density":round(dens,3),"components":nx.number_connected_components(G)}
+        txt.append(f"Size & connectivity: {n} nodes, {m} edges, density {dens:.2f}, {nx.number_connected_components(G)} connected component(s).")
+    if "B" in E:
+        mu,sd=dega.mean(),dega.std()
+        sk=float(np.mean(((dega-mu)/sd)**3)) if sd>0 else 0.0
+        ku=float(np.mean(((dega-mu)/sd)**4)-3) if sd>0 else 0.0
+        alpha=1+n/np.sum(np.log(dega/0.5)) if np.all(dega>0) else float('nan')
+        D["B_degree"]={"mean":round(mu,2),"max":int(dega.max()),"std":round(sd,2),"max_over_mean":round(dega.max()/mu,2),"skewness":round(sk,2),"kurtosis":round(ku,2),"gini":round(_gini(dega),2),"powerlaw_alpha_rough":round(alpha,2)}
+        txt.append(f"Degree distribution: mean {mu:.1f}, max {int(dega.max())}, std {sd:.1f}, max/mean {dega.max()/mu:.1f}; skewness {sk:.2f}, kurtosis {ku:.2f}, Gini {_gini(dega):.2f}; rough power-law exponent ~{alpha:.1f} (x_min=1; unreliable for small n).")
+    if "C" in E:
+        ntri=sum(nx.triangles(G).values())//3
+        nsq=int(round((np.trace(np.linalg.matrix_power(nx.to_numpy_array(G),4))-2*np.sum(dega**2)+2*m)/8)) if n<=400 else None
+        D["C_clustering"]={"avg_clustering":round(ac,3),"transitivity":round(nx.transitivity(G),3),"triangles":ntri,"squares":nsq}
+        txt.append(f"Clustering & cohesion: avg clustering {ac:.2f}, transitivity {nx.transitivity(G):.2f}; {ntri} triangles, {(str(nsq)+' 4-cycles') if nsq is not None else '4-cycle count skipped (large)'}.")
+    if "D" in E and Gc.number_of_nodes()>1:
+        apl=nx.average_shortest_path_length(Gc); diam=nx.diameter(Gc); rad=nx.radius(Gc)
+        D["D_distances"]={"avg_path_length":round(apl,2),"diameter":diam,"radius":rad}
+        txt.append(f"Distances (largest component): avg path length {apl:.2f}, diameter {diam}, radius {rad}.")
+    if "E" in E and m:
+        try: asrt=nx.degree_assortativity_coefficient(G)
+        except Exception: asrt=float('nan')
+        Q=nx.community.modularity(G,comms)
+        D["E_mixing"]={"degree_assortativity":round(asrt,2),"n_communities":len(comms),"modularity":round(Q,2)}
+        txt.append(f"Mixing & community: degree assortativity {asrt:+.2f}; {len(comms)} communities (modularity Q = {Q:.2f}).")
+    if "F" in E:
+        kc=max(nx.core_number(G).values()) if m else 0
+        try: sg=float(nx.algebraic_connectivity(Gc)) if Gc.number_of_nodes()>1 else 0.0
+        except Exception: sg=float('nan')
+        D["F_cores_spectral"]={"max_kcore":kc,"spectral_gap":round(sg,3)}
+        txt.append(f"Cores & spectral: degeneracy (max k-core) {kc}; algebraic connectivity {sg:.3f}.")
+    if "G" in E:
+        ncyc=m-n+nx.number_connected_components(G); D["G_cycles"]={"n_cycles":ncyc}
+        txt.append(f"Cycles: {ncyc} independent cycles (cyclomatic number).")
+    if "H" in E and n>2:
+        D["H_centrality"]={"betweenness_mean":round(float(np.mean(list(bc.values()))),3),"betweenness_max":round(max(bc.values()),3),"closeness_mean":round(float(np.mean(list(clo.values()))),2),"eigenvector_mean":round(float(np.mean(list(eig.values()))),2),"eigenvector_max":round(max(eig.values()),2)}
+        txt.append(f"Centrality (graph summaries): betweenness mean {np.mean(list(bc.values())):.3f} / max {max(bc.values()):.3f}; closeness mean {np.mean(list(clo.values())):.2f}; eigenvector mean {np.mean(list(eig.values())):.2f} / max {max(eig.values()):.2f}.")
+    if "I" in E:
+        D["I_key_nodes"]={"top_degree":[str(v) for v in sorted(deg,key=lambda x:deg[x],reverse=True)[:5]],"top_betweenness":[str(v) for v in sorted(bc,key=lambda x:bc[x],reverse=True)[:5]],"top_eigenvector":[str(v) for v in sorted(eig,key=lambda x:eig[x],reverse=True)[:5]]}
+        txt.append(f"Key nodes: most connected {_topk(deg)}; top brokers (betweenness) {_topk(bc)}; most central (eigenvector) {_topk(eig)}.")
+    if "J" in E and m and n>2:
+        km=dega.mean(); k2=(dega**2).mean()
+        Cc=(k2-km)**2/(n*km**3) if km>0 else 0.0
+        Lr=np.log(n)/np.log(km) if km>1 else float('nan')
+        try: L=nx.average_shortest_path_length(Gc)
+        except Exception: L=float('nan')
+        Cl=3*(km-2)/(4*(km-1)) if km>1 else float('nan')
+        sigma=(ac/dens)/(L/Lr) if (dens>0 and L and Lr==Lr) else float('nan')
+        omega=(Lr/L-ac/Cl) if (L and Cl==Cl and Cl) else float('nan')
+        rC=(ac/Cc) if Cc>0 else float('nan')
+        D["J_null_model"]={"er_clustering_ratio":round(ac/dens,2) if dens>0 else None,"config_clustering":round(Cc,2),"config_clustering_ratio":round(rC,2) if Cc>0 else None,"smallworld_sigma":round(sigma,2),"smallworld_omega":round(omega,2)}
+        txt.append(f"Null-model contrasts: clustering {ac:.2f} vs ER {dens:.2f} ({ac/dens:.1f}x) and configuration model {Cc:.2f} ({rC:.1f}x); small-world sigma {sigma:.2f}, omega {omega:.2f}. (small n -> wide.)")
+    if "K" in E:
+        if n<=PERNODE_CAP:
+            per={}; lines=[]
+            for v in G:
+                nb=[str(u) for u in G.neighbors(v)]
+                per[str(v)]={"degree":deg[v],"betweenness":round(bc[v],3),"eigenvector":round(eig[v],3),"community":node2c[v],"neighbors":nb}
+                lines.append(f"  {v}: degree {deg[v]}, betweenness {bc[v]:.2f}, eigenvector {eig[v]:.2f}, community {node2c[v]}; neighbors: {', '.join(nb)}")
+            D["K_per_node"]=per
+            txt.append("Per-node detail (label: degree, betweenness, eigenvector, community; neighbors):\n"+"\n".join(lines))
+        else:
+            D["K_per_node"]={"note":f"omitted (n={n}>{PERNODE_CAP}); ask about a specific node's neighborhood instead"}
+            txt.append(f"Per-node detail omitted (n={n} > {PERNODE_CAP}); query a specific node's ego-graph instead.")
+    return ("\n".join(txt) if txt else "(no feature groups selected)"), D
 
 def _office():
     people = {"Alice":("Eng","snr"),"Bob":("Eng","jr"),"Carol":("Eng","jr"),"Dan":("Eng","jr"),
@@ -367,10 +477,8 @@ def _node_prompt(verb, question):
             "Answer concisely about node #0, citing the specific numbers above that "
             "justify your reasoning.")
 
-def _analyze_graph(G, attr, question):
-    na=[attr] if attr else None
-    f=facts(G,node_attrs=na)
-    verb=verbalize(f,focus="all")
+def _analyze_graph(G, attr, question, feats="ABCDEFGHIJK"):
+    verb,D=candidate_analyze(G,attr,feats)
     pos=nx.spring_layout(G,seed=42)
     nodes=[{"id":str(n),"x":float(pos[n][0]),"y":float(pos[n][1]),
             "g":(str(G.nodes[n].get(attr)) if attr else None)} for n in G]
@@ -379,14 +487,12 @@ def _analyze_graph(G, attr, question):
     return json.dumps({"is_node":False,"verbalization":verb,
                        "prompt":_graph_prompt(verb,question),"nodes":nodes,"edges":edges,
                        "groups":groups,"attr":attr,"target":None,
-                       "facts_json":json.dumps({k:v for k,v in f["structure"].items()},indent=2)})
+                       "facts_json":json.dumps(D,indent=2)})
 
-def _analyze_node(G, target, attr, question):
+def _analyze_node(G, target, attr, question, feats="ABCDEFGHIJK"):
     # Extract the target's k-hop ego-graph, relabel target -> #0 (node_icl.py protocol).
     H,glob=_ego_marked(G,target)
-    na=[attr] if attr else None
-    f=facts(H,node_attrs=na)
-    verb=verbalize(f,focus="all")
+    verb,D=candidate_analyze(H,attr,feats)
     pos=nx.spring_layout(H,seed=42)
     # Node ids in the ego-graph are the relabeled 0..n-1 ids; #0 is the target.
     nodes=[{"id":str(n),"x":float(pos[n][0]),"y":float(pos[n][1]),
@@ -397,20 +503,20 @@ def _analyze_node(G, target, attr, question):
     return json.dumps({"is_node":True,"verbalization":verb,
                        "prompt":_node_prompt(verb,question),"nodes":nodes,"edges":edges,
                        "groups":groups,"attr":attr,"target":"0",
-                       "facts_json":json.dumps({k:v for k,v in f["structure"].items()},indent=2)})
+                       "facts_json":json.dumps(D,indent=2)})
 
-def analyze(example, edges_text, attrs_text, question):
+def analyze(example, edges_text, attrs_text, question, feats="ABCDEFGHIJK"):
     # Pasted graph always wins (whole-graph only); else dispatch on the example key.
     if edges_text.strip():
         G,attr=_from_text(edges_text,attrs_text)
         if G.number_of_nodes()==0: return json.dumps({"error":"Empty graph — check your edge list."})
-        return _analyze_graph(G,attr,question)
+        return _analyze_graph(G,attr,question,feats)
     if example in NODE_BUILDERS:
         G,target,attr=NODE_BUILDERS[example]()
-        return _analyze_node(G,target,attr,question)
+        return _analyze_node(G,target,attr,question,feats)
     G,attr=BUILDERS.get(example,_office)()
     if G.number_of_nodes()==0: return json.dumps({"error":"Empty graph — check your edge list."})
-    return _analyze_graph(G,attr,question)
+    return _analyze_graph(G,attr,question,feats)
 </script>
 
 <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
@@ -487,6 +593,7 @@ async function boot() {
     await pyodide.loadPackage("micropip");
     const micropip = pyodide.pyimport("micropip");
     const wheel = new URL("graphlex-0.0.1-py3-none-any.whl", window.location.href).href;
+    await pyodide.loadPackage("scipy");   // for algebraic connectivity / eigenvector centrality
     await micropip.install(["networkx", wheel]);   // pulls numpy automatically
     pyodide.runPython(document.getElementById('pycode').textContent);
     analyzeFn = pyodide.globals.get("analyze");
@@ -505,11 +612,13 @@ function run() {
   const btn = document.getElementById('go');
   btn.disabled = true; btn.textContent = "Computing…";
   try {
+    const feats = Array.from(document.querySelectorAll('.grp:checked')).map(c=>c.value).join('');
     const res = analyzeFn(
       document.getElementById('example').value,
       document.getElementById('edges').value,
       document.getElementById('attrs').value,
-      document.getElementById('question').value);
+      document.getElementById('question').value,
+      feats);
     const d = JSON.parse(res);
     if (d.error) { alert(d.error); return; }
     document.getElementById('out').classList.remove('hidden');
