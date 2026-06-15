@@ -68,10 +68,11 @@
       <h2>1. Choose or paste a graph</h2>
       <div class="row">
         <div>
-          <label for="example">Built-in example</label>
+          <label for="example">Select a network</label>
           <select id="example" onchange="onExample()">
+            <option value="custom">Input your own network</option>
             <optgroup label="Social / real">
-              <option value="office">Office collaboration (dept + seniority)</option>
+              <option value="office" selected>Office collaboration (dept + seniority)</option>
               <option value="karate">Zachary's Karate Club (club split)</option>
               <option value="florentine">Florentine families (Renaissance marriages)</option>
               <option value="lesmis">Les Misérables (character co-occurrence)</option>
@@ -105,9 +106,9 @@
               <option value="node_snap_email">Email org (SNAP, real): which department is the target person in?</option>
             </optgroup>
           </select>
-          <p class="muted">Or paste your own on the right (used instead of the example if non-empty).</p>
+          <p class="muted">Or choose <em>Input your own network</em> to paste an edge list.</p>
         </div>
-        <div>
+        <div id="customInput" style="display:none">
           <label for="edges">Edge list (e.g. <code>0-1, 1-2, 2-0</code>)</label>
           <textarea id="edges" rows="3" placeholder="0-1, 1-2, 2-0, 2-3" onchange="run()"></textarea>
           <label for="attrs">Optional node attributes (e.g. <code>0:A, 1:A, 2:B</code>)</label>
@@ -444,6 +445,10 @@ const QUESTIONS = {
 const NODE_EXAMPLES = new Set(["node_citation","node_social","node_atom","node_snap_email"]);
 function onExample() {
   const ex = document.getElementById('example').value;
+  const custom = (ex === 'custom');
+  // The edge-list / node-attribute inputs only appear for "Input your own network".
+  document.getElementById('customInput').style.display = custom ? '' : 'none';
+  if (custom) return;          // wait for a pasted graph; don't run on an empty one
   // Picking an example means "show this example": clear any pasted graph so it
   // doesn't keep overriding the dropdown (run() prioritizes a non-empty edge list).
   document.getElementById('edges').value = '';
@@ -495,6 +500,8 @@ async function boot() {
 
 function run() {
   if (!analyzeFn) return;
+  if (document.getElementById('example').value === 'custom'
+      && !document.getElementById('edges').value.trim()) return;  // custom selected, nothing pasted yet
   const btn = document.getElementById('go');
   btn.disabled = true; btn.textContent = "Computing…";
   try {
