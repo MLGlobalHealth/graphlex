@@ -42,6 +42,7 @@ REPO = "/home/scratch/Dropbox/Seth/Research/MLGHrepos/graphlex"
 EVAL = os.path.join(REPO, "eval")
 FIGDIR = os.path.join(EVAL, "figures")
 SWEEP = "/home/scratch/bench_out/sweep"
+FM_REPR = "/home/scratch/bench_out/fm_repr"  # per-encoder FM-embedding+logreg arm
 LABELCURVE = "/home/scratch/bench_out/labelcurve"
 ZEROLABEL = "/home/scratch/bench_out/zerolabel"
 CACHE = os.path.join(FIGDIR, "_sweep_cache.json")
@@ -55,6 +56,24 @@ DOMAIN_ORDER = ["chemistry", "biology", "neuroscience", "social",
 # Shared answer-line parser + balanced-accuracy metric (see eval/_common.py).
 sys.path.insert(0, EVAL)
 from _common import parse_ans, bal_acc  # noqa: E402
+
+
+# ===========================================================================
+# FM representation-mode arm (frozen embeddings + logreg head)
+# ===========================================================================
+def fm_repr_balacc(dataset, encoder="graphpfn"):
+    """Mean balanced accuracy of the FM-embedding+logreg arm for one dataset.
+
+    Reads the per-dataset JSON written by eval/fm_repr_baseline.py (same matched
+    few-shot splits + BALANCED accuracy as every sweep arm). Returns None if the
+    result file is missing so the heatmap shows a hatched 'not scored' cell.
+    """
+    p = os.path.join(FM_REPR, encoder, f"{dataset}.json")
+    if not os.path.exists(p):
+        return None
+    res = json.load(open(p))
+    m = res.get("mean", {}).get(encoder)
+    return float(m[0]) if m else None
 
 
 # ===========================================================================
@@ -89,6 +108,7 @@ def compute_sweep_table(refresh=False):
             "qwen14": br.llm_balacc(ds, "qwen"),
             "qwen32": br.llm_balacc(ds, "qwen32"),
             "opus": br.llm_balacc(ds, "opus"),
+            "graphpfn": fm_repr_balacc(ds, "graphpfn"),
         })
     with open(CACHE, "w") as fh:
         json.dump(rows, fh, indent=2)
@@ -111,6 +131,7 @@ def _order_rows(rows):
 
 
 METHODS = [("classic", "Classical\n(logreg)"),
+           ("graphpfn", "GraphPFN-embed\n(frozen+logreg)"),
            ("qwen14", "Qwen-14B"),
            ("qwen32", "Qwen-32B"),
            ("opus", "Opus")]
