@@ -93,6 +93,11 @@
             <optgroup label="Chemistry">
               <option value="molecule">Molecule (benzene + nitro group)</option>
             </optgroup>
+            <optgroup label="Node-level (k=2 ego-graph; target = node #0)">
+              <option value="node_citation">Citation: which area is the target paper?</option>
+              <option value="node_social">Social: what role does the target person play?</option>
+              <option value="node_atom">Molecule: what is the target atom's environment?</option>
+            </optgroup>
           </select>
           <p class="muted">Or paste your own on the right (used instead of the example if non-empty).</p>
         </div>
@@ -187,6 +192,85 @@ BUILDERS={"office":_office,"molecule":_molecule,"karate":_karate,"florentine":_f
           "lesmis":_lesmis,"sbm":_sbm,"caveman":_caveman,"grid":_grid,"tree":_tree,
           "star":_star,"complete":_complete,"powerlaw":_powerlaw,"er":_er,"ba":_ba,"ws":_ws}
 
+# ---------------------------------------------------------------------------
+# NODE-LEVEL examples. Same facts()/verbalize() machinery, but pointed at a
+# single TARGET node's k-hop ego-graph instead of a whole graph. Each builder
+# returns (G, target_node, attr). The ego protocol below mirrors
+# eval/node_icl.py exactly: target relabeled to #0 (placed first), capped at
+# MAX_EGO nodes (BFS-nearest kept, target always retained), an explicit
+# "TARGET NODE = #0" marker in the prompt.
+KHOP_EGO = 2      # ego-graph radius (node_icl.py KHOP)
+MAX_EGO  = 25     # cap ego-graph node count (node_icl.py MAX_EGO)
+
+def _node_citation():
+    # A target paper (#0, area unknown) plus the papers it cites / is cited by,
+    # each labeled with a readable research area. Ask: which area is the target?
+    papers={"P_target":"?","GraphSAGE":"GraphML","GCN":"GraphML","GAT":"GraphML",
+            "node2vec":"GraphML","DeepWalk":"GraphML","Transformer":"NLP","BERT":"NLP",
+            "Word2Vec":"NLP","ResNet":"Vision","ImageNet":"Vision","Adam":"Optim",
+            "Dropout":"Optim"}
+    E=[("P_target","GraphSAGE"),("P_target","GCN"),("P_target","GAT"),
+       ("P_target","node2vec"),("P_target","Adam"),
+       ("GCN","GraphSAGE"),("GAT","GCN"),("node2vec","GraphSAGE"),("DeepWalk","node2vec"),
+       ("DeepWalk","GraphSAGE"),("GCN","Dropout"),("GAT","Adam"),
+       ("Transformer","BERT"),("BERT","Word2Vec"),("Word2Vec","node2vec"),
+       ("ResNet","ImageNet"),("ResNet","Dropout"),("ImageNet","Adam")]
+    G=nx.Graph()
+    for p,t in papers.items(): G.add_node(p,area=t)
+    G.add_edges_from(E)
+    return G,"P_target","area"
+
+def _node_social():
+    # A target person (#0, team unknown) plus colleagues, each with team + city.
+    # Ask: what role does the target play, and which team do they belong to?
+    people={"Maya":("?","?"),"Ben":("Design","Berlin"),"Chloe":("Design","Berlin"),
+            "Diego":("Eng","Berlin"),"Ella":("Eng","Lisbon"),"Finn":("Sales","Lisbon"),
+            "Gus":("Sales","Lisbon"),"Hana":("Design","Berlin"),"Ivan":("Eng","Berlin")}
+    E=[("Maya","Ben"),("Maya","Chloe"),("Maya","Diego"),("Maya","Hana"),("Maya","Finn"),
+       ("Ben","Chloe"),("Ben","Hana"),("Chloe","Hana"),("Diego","Ivan"),("Diego","Ella"),
+       ("Finn","Gus"),("Gus","Ella"),("Ivan","Ben")]
+    G=nx.Graph()
+    for p,(team,city) in people.items(): G.add_node(p,team=team)
+    G.add_edges_from(E)
+    return G,"Maya","team"
+
+def _node_atom():
+    # A target carbon atom (#0) and its bonded environment. Ask: what is the
+    # local chemical role/environment of the target atom?
+    atoms={"C1":"Carbon","C2":"Carbon","C3":"Carbon","C4":"Carbon",
+           "O1":"Oxygen","O2":"Oxygen","N1":"Nitrogen","H1":"Hydrogen","H2":"Hydrogen"}
+    G=nx.Graph()
+    for n,a in atoms.items(): G.add_node(n,atom=a)
+    G.add_edges_from([("C1","C2"),("C2","C3"),("C2","O1"),("C3","C4"),
+                      ("C3","O2"),("O2","H1"),("C1","N1"),("N1","H2")])
+    return G,"C2","atom"
+
+NODE_BUILDERS={"node_citation":_node_citation,"node_social":_node_social,
+               "node_atom":_node_atom}
+
+def _ego_marked(G, target, khop=KHOP_EGO, max_ego=MAX_EGO):
+    """k-hop ego-graph of `target`, capped to <=max_ego nodes (BFS-nearest kept,
+    target always retained), relabeled so the target is node 0 placed first.
+    Mirrors eval/node_icl.py::ego_nx. Returns (H, glob) where glob[i] is the
+    original node now at id i (glob[0] == target)."""
+    ego=nx.ego_graph(G, target, radius=khop)
+    if ego.number_of_nodes()>max_ego:
+        order,seen,frontier=[target],{target},[target]
+        while frontier and len(order)<max_ego:
+            nxt=[]
+            for u in frontier:
+                for w in ego.neighbors(u):
+                    if w not in seen:
+                        seen.add(w); order.append(w); nxt.append(w)
+                        if len(order)>=max_ego: break
+                if len(order)>=max_ego: break
+            frontier=nxt
+        ego=ego.subgraph(order).copy()
+    glob=[target]+[n for n in ego.nodes() if n!=target]
+    idx={g:i for i,g in enumerate(glob)}
+    H=nx.relabel_nodes(ego, idx, copy=True)
+    return H, glob
+
 def _from_text(edges_text, attrs_text):
     G=nx.Graph()
     for tok in edges_text.replace(";",",").split(","):
@@ -206,10 +290,21 @@ def _from_text(edges_text, attrs_text):
         if not nx.get_node_attributes(G,attr): attr=None
     return G,attr
 
-def analyze(example, edges_text, attrs_text, question):
-    if edges_text.strip(): G,attr=_from_text(edges_text,attrs_text)
-    else: G,attr=BUILDERS.get(example,_office)()
-    if G.number_of_nodes()==0: return json.dumps({"error":"Empty graph — check your edge list."})
+def _graph_prompt(verb, question):
+    return ("You are analyzing a graph. Here is a factual, deterministically-computed "
+            "description of its structure (you do NOT have the raw graph, only this "
+            "verbalized summary):\n\n"+verb+"\n\nQuestion: "+(question or "")+"\n\n"
+            "Answer concisely, citing the specific numbers above that justify your reasoning.")
+
+def _node_prompt(verb, question):
+    return ("You are analyzing a single TARGET NODE inside a network, given a factual, "
+            "deterministically-computed description of its k-hop ego-graph (the target "
+            "node plus its nearby neighbors). The target node is node #0.\n\n"
+            "TARGET NODE = #0\n\n"+verb+"\n\nQuestion: "+(question or "")+"\n\n"
+            "Answer concisely about node #0, citing the specific numbers above that "
+            "justify your reasoning.")
+
+def _analyze_graph(G, attr, question):
     na=[attr] if attr else None
     f=facts(G,node_attrs=na)
     verb=verbalize(f,focus="all")
@@ -218,13 +313,41 @@ def analyze(example, edges_text, attrs_text, question):
             "g":(str(G.nodes[n].get(attr)) if attr else None)} for n in G]
     edges=[{"s":str(u),"t":str(v)} for u,v in G.edges()]
     groups=sorted({str(G.nodes[n].get(attr)) for n in G}) if attr else []
-    prompt=("You are analyzing a graph. Here is a factual, deterministically-computed "
-            "description of its structure (you do NOT have the raw graph, only this "
-            "verbalized summary):\n\n"+verb+"\n\nQuestion: "+(question or "")+"\n\n"
-            "Answer concisely, citing the specific numbers above that justify your reasoning.")
-    return json.dumps({"verbalization":verb,"prompt":prompt,"nodes":nodes,"edges":edges,
-                       "groups":groups,"attr":attr,
+    return json.dumps({"is_node":False,"verbalization":verb,
+                       "prompt":_graph_prompt(verb,question),"nodes":nodes,"edges":edges,
+                       "groups":groups,"attr":attr,"target":None,
                        "facts_json":json.dumps({k:v for k,v in f["structure"].items()},indent=2)})
+
+def _analyze_node(G, target, attr, question):
+    # Extract the target's k-hop ego-graph, relabel target -> #0 (node_icl.py protocol).
+    H,glob=_ego_marked(G,target)
+    na=[attr] if attr else None
+    f=facts(H,node_attrs=na)
+    verb=verbalize(f,focus="all")
+    pos=nx.spring_layout(H,seed=42)
+    # Node ids in the ego-graph are the relabeled 0..n-1 ids; #0 is the target.
+    nodes=[{"id":str(n),"x":float(pos[n][0]),"y":float(pos[n][1]),
+            "g":(str(H.nodes[n].get(attr)) if attr else None),
+            "target":bool(n==0)} for n in H]
+    edges=[{"s":str(u),"t":str(v)} for u,v in H.edges()]
+    groups=sorted({str(H.nodes[n].get(attr)) for n in H}) if attr else []
+    return json.dumps({"is_node":True,"verbalization":verb,
+                       "prompt":_node_prompt(verb,question),"nodes":nodes,"edges":edges,
+                       "groups":groups,"attr":attr,"target":"0",
+                       "facts_json":json.dumps({k:v for k,v in f["structure"].items()},indent=2)})
+
+def analyze(example, edges_text, attrs_text, question):
+    # Pasted graph always wins (whole-graph only); else dispatch on the example key.
+    if edges_text.strip():
+        G,attr=_from_text(edges_text,attrs_text)
+        if G.number_of_nodes()==0: return json.dumps({"error":"Empty graph — check your edge list."})
+        return _analyze_graph(G,attr,question)
+    if example in NODE_BUILDERS:
+        G,target,attr=NODE_BUILDERS[example]()
+        return _analyze_node(G,target,attr,question)
+    G,attr=BUILDERS.get(example,_office)()
+    if G.number_of_nodes()==0: return json.dumps({"error":"Empty graph — check your edge list."})
+    return _analyze_graph(G,attr,question)
 </script>
 
 <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
@@ -246,7 +369,13 @@ const QUESTIONS = {
   star: "Is this network centralized around a single hub? What is the evidence?",
   complete: "How densely connected is this network?",
   molecule: "Which functional groups does this molecule contain, and what might that imply?",
+  // Node-level: questions are about the TARGET node (#0) and its ego-graph.
+  node_citation: "Based only on the topics of the papers the target (node #0) cites and co-cites, which research area does the target paper most likely belong to, and why?",
+  node_social: "What role does the target person (node #0) play in this local network — hub, bridge, or peripheral — and which team do they most likely belong to? Cite the evidence.",
+  node_atom: "Describe the local chemical environment / role of the target atom (node #0): which atoms is it bonded to or near, and is it central or peripheral in this neighborhood?",
 };
+// Which examples are node-level (drive the node-centric prompt + target marker in JS).
+const NODE_EXAMPLES = new Set(["node_citation","node_social","node_atom"]);
 function onExample() {
   const ex = document.getElementById('example').value;
   // Picking an example means "show this example": clear any pasted graph so it
@@ -256,10 +385,18 @@ function onExample() {
   if (QUESTIONS[ex]) document.getElementById('question').value = QUESTIONS[ex];
   run();
 }
-let pyodide = null, analyzeFn = null, lastVerb = "";
+let pyodide = null, analyzeFn = null, lastVerb = "", lastIsNode = false;
 
-// Mirrors the server-side prompt built in Python EXACTLY — keep in sync.
-function buildPrompt(verb, q) {
+// Mirrors the Python prompt builders EXACTLY (_graph_prompt / _node_prompt) — keep in sync.
+function buildPrompt(verb, q, isNode) {
+  if (isNode) {
+    return "You are analyzing a single TARGET NODE inside a network, given a factual, " +
+      "deterministically-computed description of its k-hop ego-graph (the target " +
+      "node plus its nearby neighbors). The target node is node #0.\n\n" +
+      "TARGET NODE = #0\n\n" + verb + "\n\nQuestion: " + (q || "") + "\n\n" +
+      "Answer concisely about node #0, citing the specific numbers above that " +
+      "justify your reasoning.";
+  }
   return "You are analyzing a graph. Here is a factual, deterministically-computed " +
     "description of its structure (you do NOT have the raw graph, only this " +
     "verbalized summary):\n\n" + verb + "\n\nQuestion: " + (q || "") + "\n\n" +
@@ -269,7 +406,7 @@ function buildPrompt(verb, q) {
 function onQ() {
   if (!lastVerb) return;
   document.getElementById('prompt').textContent =
-    buildPrompt(lastVerb, document.getElementById('question').value);
+    buildPrompt(lastVerb, document.getElementById('question').value, lastIsNode);
 }
 
 async function boot() {
@@ -307,8 +444,10 @@ function run() {
     document.getElementById('facts').textContent = d.facts_json;
     document.getElementById('prompt').textContent = d.prompt;
     lastVerb = d.verbalization;   // enable instant question->prompt updates
-    document.getElementById('promptLabel').textContent =
-      "Prompt to copy (verbalized facts + your question; no raw structure) — paste into any chatbot:";
+    lastIsNode = !!d.is_node;
+    document.getElementById('promptLabel').textContent = d.is_node
+      ? "Node-level prompt to copy (TARGET NODE #0 + its verbalized ego-graph + your question) — paste into any chatbot:"
+      : "Prompt to copy (verbalized facts + your question; no raw structure) — paste into any chatbot:";
     drawGraph(d);
   } catch (e) {
     alert("Error: " + e);
@@ -333,14 +472,26 @@ function drawGraph(d) {
   });
   const label = d.nodes.length <= 25;
   d.nodes.forEach(n => {
-    s += `<circle cx="${sx(n.x)}" cy="${sy(n.y)}" r="11" fill="${fill(n)}" stroke="#555" stroke-width="1"/>`;
+    if (n.target) {
+      // Highlight the TARGET node (#0) of a node-level ego-graph.
+      s += `<circle cx="${sx(n.x)}" cy="${sy(n.y)}" r="15" fill="none" stroke="#c05621" stroke-width="2.5"/>`;
+      s += `<circle cx="${sx(n.x)}" cy="${sy(n.y)}" r="11" fill="${fill(n)}" stroke="#c05621" stroke-width="2"/>`;
+    } else {
+      s += `<circle cx="${sx(n.x)}" cy="${sy(n.y)}" r="11" fill="${fill(n)}" stroke="#555" stroke-width="1"/>`;
+    }
     if (label) s += `<text x="${sx(n.x)}" y="${sy(n.y)+3}" font-size="8" text-anchor="middle" fill="#000">${esc(n.id)}</text>`;
   });
+  let yy = 16;
+  if (d.is_node) {
+    s += `<circle cx="14" cy="${yy}" r="7" fill="#fff" stroke="#c05621" stroke-width="2.5"/>`;
+    s += `<text x="26" y="${yy+3}" font-size="11" fill="#1a202c">target node #0</text>`;
+    yy += 18;
+  }
   if (d.groups && d.groups.length) {
     d.groups.forEach((g, i) => {
-      const yy = 16 + i*18;
       s += `<circle cx="14" cy="${yy}" r="7" fill="${colorOf[g]}" stroke="#555"/>`;
       s += `<text x="26" y="${yy+3}" font-size="11" fill="#1a202c">${esc(g)}</text>`;
+      yy += 18;
     });
   }
   document.getElementById('graph').innerHTML = s;
