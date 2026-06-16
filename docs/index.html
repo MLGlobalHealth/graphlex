@@ -54,10 +54,8 @@
 </head>
 <body>
 <header>
-  <h1>graphlex &mdash; turn a network into LLM-ready language</h1>
-  <div class="pipe"><b>NetworkX</b> &rarr; <b>graphlex.facts()</b> (exact numbers) &rarr;
-     <b>graphlex.verbalize()</b> (thresholds &rarr; prose) &rarr; copy into <b>ChatGPT / Claude</b>.
-     Runs entirely in your browser (Pyodide) &mdash; no server, no data leaves your machine.</div>
+  <h1>graphlex (v0.01) &mdash; turn a network into LLM-ready language</h1>
+  <div class="pipe">This is running entirely in your browser!</div>
 </header>
 
 <main>
@@ -117,6 +115,8 @@
       </div>
       <button id="go" onclick="run()">Re-run / apply pasted graph</button>
       <span class="muted">&nbsp; Examples &amp; pasted graphs update automatically; this button just forces a re-run.</span>
+      <div class="badge nx" style="margin-top:12px">NetworkX spring layout</div>
+      <svg id="graph" viewBox="0 0 400 360" preserveAspectRatio="xMidYMid meet" style="max-width:460px;width:100%;height:auto;display:block"></svg>
     </div>
 
     <div id="out" class="card hidden">
@@ -137,33 +137,25 @@
           <label><input type="checkbox" class="grp" value="K" checked onchange="run()"> <b>K. Per-node detail &amp; relations</b> <span class="muted">each node's label, degree, centralities, community, neighbor list</span></label>
         </div>
       </details>
-      <div class="results">
-        <div>
-          <div class="badge nx">NetworkX spring layout</div>
-          <svg id="graph" viewBox="0 0 400 360" preserveAspectRatio="xMidYMid meet" style="max-width:460px;width:100%;height:auto;display:block"></svg>
-          <details><summary>Show raw facts() structure (JSON)</summary><pre id="facts"></pre></details>
-        </div>
-        <div>
-          <div class="ctxlabel" id="promptLabel"></div>
-          <div class="promptwrap">
-            <button class="copybtn" onclick="copyPrompt(this)">Copy</button>
-            <div class="prompt">
-              <div id="promptPre" style="opacity:.55"></div>
-              <div class="badge det" style="margin:10px 0 4px">Computed by NetworkX + graphlex &mdash; deterministic, no LLM</div>
-              <div id="promptVerb" style="white-space:pre-wrap"></div>
-              <div style="opacity:.55;margin-top:10px">Question:</div>
-              <textarea id="question" rows="2" placeholder="Ask the LLM about this network…" style="width:100%;box-sizing:border-box;font:inherit;white-space:pre-wrap;border:1px solid #cbd5e0;border-radius:4px;padding:6px;margin-top:4px;background:#fff;resize:vertical"></textarea>
-              <div id="promptPost" style="opacity:.55;margin-top:10px"></div>
-            </div>
-          </div>
-          <div class="openrow">
-            <span class="muted">Copy, then paste into:</span>
-            <a href="https://chatgpt.com/" target="_blank" rel="noopener">Open ChatGPT ↗</a>
-            <a href="https://claude.ai/new" target="_blank" rel="noopener">Open Claude ↗</a>
-            <a href="https://gemini.google.com/app" target="_blank" rel="noopener">Open Gemini ↗</a>
-          </div>
+      <div class="ctxlabel" id="promptLabel"></div>
+      <div class="promptwrap">
+        <button class="copybtn" onclick="copyPrompt(this)">Copy</button>
+        <div class="prompt">
+          <div id="promptPre" style="opacity:.55"></div>
+          <div class="badge det" style="margin:10px 0 4px">Computed by NetworkX + graphlex &mdash; deterministic, no LLM</div>
+          <div id="promptVerb" style="white-space:pre-wrap"></div>
+          <div style="opacity:.55;margin-top:10px">Question:</div>
+          <textarea id="question" rows="2" placeholder="Ask the LLM about this network…" style="width:100%;box-sizing:border-box;font:inherit;white-space:pre-wrap;border:1px solid #cbd5e0;border-radius:4px;padding:6px;margin-top:4px;background:#fff;resize:vertical"></textarea>
+          <div id="promptPost" style="opacity:.55;margin-top:10px"></div>
         </div>
       </div>
+      <div class="openrow">
+        <span class="muted">Copy, then paste into:</span>
+        <a href="https://chatgpt.com/" target="_blank" rel="noopener">Open ChatGPT ↗</a>
+        <a href="https://claude.ai/new" target="_blank" rel="noopener">Open Claude ↗</a>
+        <a href="https://gemini.google.com/app" target="_blank" rel="noopener">Open Gemini ↗</a>
+      </div>
+      <details style="margin-top:12px"><summary>Show raw facts() structure (JSON)</summary><pre id="facts"></pre></details>
       <p class="muted">The model only ever sees the verbalized facts above &mdash; never the raw graph.
          That is the whole point: NetworkX computes the structure exactly; the LLM just reasons over it.</p>
     </div>
