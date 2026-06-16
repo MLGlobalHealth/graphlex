@@ -1,0 +1,154 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs,longtable,array,amsmath,amssymb}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xcolor}
+
+\newcommand{\cur}{{\footnotesize\textsc{cur}}}   % currently in facts()
+\newcommand{\prt}{{\footnotesize\textsc{port}}}  % computed in original properties.py; not yet in facts()
+\newcommand{\nw}{{\footnotesize\textsc{new}}}    % net-new (not in any existing code)
+\newcommand{\keep}{$\square$}
+\newcolumntype{F}{>{\ttfamily\small}p{0.215\textwidth}}
+\newcolumntype{D}{p{0.50\textwidth}}
+
+\title{\texttt{graphlex.facts()} --- feature specification for finalization}
+\author{graphlex project (graph $\rightarrow$ deterministic, LLM-interpretable language)}
+\date{2026-06-15 (draft for collaborator review)}
+
+\begin{document}
+\maketitle
+
+\noindent\textbf{Purpose.} \texttt{facts(G)} is the single deterministic contract of
+graphlex: it maps a NetworkX graph to exact structural quantities (\emph{no LLM}). This
+document lists every candidate feature so we can finalize the set. Please mark the
+\textbf{Keep?} box (or strike a feature / add one).
+
+\medskip
+\noindent\textbf{The non-negotiable design rule.} The same finalized feature set must be
+carried, identically, by all four of:
+\begin{enumerate}\itemsep0pt
+  \item \textbf{facts()} --- computed values;
+  \item \textbf{verbalize()} --- the text the \emph{LLM} sees;
+  \item the \textbf{logreg feature vector} --- what the classical (no-LLM) baseline is trained on;
+  \item the \textbf{canonical reference} (\texttt{src/graphfm/eval/properties.py}, the original NetworkStats vector).
+\end{enumerate}
+The headline comparison (``LLM over verbalized features vs.\ logreg over the same
+features'') is only coherent if (1)--(3) are byte-for-byte the same feature set. They are
+\emph{not} today; this spec is the fix. Implementation should declare each feature
+\emph{once} in a shared registry from which facts(), verbalize(), and the logreg vector
+all derive, plus a \texttt{verbalization\_version} stamp recorded in every result file.
+
+\medskip
+\noindent\textbf{Status legend.} \cur~= already in \texttt{facts()}; \prt~= already
+computed in \texttt{properties.py}, needs porting; \nw~= net-new.
+
+\footnotesize
+\begin{longtable}{F D c c}
+\toprule
+\textbf{feature} & \textbf{definition} & \textbf{status} & \textbf{keep?}\\
+\midrule
+\endhead
+\multicolumn{4}{l}{\textbf{\normalsize A. Size \& connectivity}}\\
+\midrule
+n\_nodes & number of nodes $n$ & \cur & \keep\\
+n\_edges & number of edges $m$ & \cur & \keep\\
+density & $2m/[n(n-1)]$ & \cur & \keep\\
+n\_components & number of connected components & \cur & \keep\\
+\midrule
+\multicolumn{4}{l}{\textbf{\normalsize B. Degree distribution (incl.\ scale-free indicators)}}\\
+\midrule
+mean\_degree & $\langle k\rangle$ & \cur & \keep\\
+max\_degree & $\max_i k_i$ & \cur & \keep\\
+degree\_std & standard deviation of degree & \cur & \keep\\
+max\_over\_mean\_degree & $\max k / \langle k\rangle$ (hub dominance) & \cur & \keep\\
+degree\_skewness & 3rd standardized moment of the degree distribution & \prt & \keep\\
+degree\_kurtosis & 4th standardized moment (tail heaviness) & \prt & \keep\\
+degree\_gini & Gini coefficient of degrees (inequality / heavy tail) & \prt & \keep\\
+powerlaw\_alpha & power-law exponent (Clauset--Shalizi--Newman fit) & \nw & \keep\\
+powerlaw\_xmin & lower cutoff of the fitted power law & \nw & \keep\\
+powerlaw\_ks & KS distance of the fit; \emph{flag ``unreliable, $n$ small'' for $n\lesssim 50$} & \nw & \keep\\
+\midrule
+\multicolumn{4}{l}{\textbf{\normalsize C. Clustering \& cohesion}}\\
+\midrule
+avg\_clustering & mean local clustering coefficient & \cur & \keep\\
+transitivity & $3\times$(triangles)$/$(connected triples) & \cur & \keep\\
+n\_triangles & number of triangles & \prt & \keep\\
+n\_squares & number of 4-cycles & \prt & \keep\\
+\midrule
+\multicolumn{4}{l}{\textbf{\normalsize D. Distances (largest connected component)}}\\
+\midrule
+avg\_path\_length & mean shortest-path length & \cur & \keep\\
+diameter & maximum shortest-path length & \cur & \keep\\
+radius & minimum node eccentricity & \nw & \keep\\
+\midrule
+\multicolumn{4}{l}{\textbf{\normalsize E. Mixing \& community}}\\
+\midrule
+degree\_assortativity & Pearson correlation of endpoint degrees & \cur & \keep\\
+n\_communities & number of greedy-modularity communities & \cur & \keep\\
+modularity & Newman modularity $Q$ of that partition (already a config-null contrast) & \prt & \keep\\
+\midrule
+\multicolumn{4}{l}{\textbf{\normalsize F. Cores \& spectral}}\\
+\midrule
+max\_kcore & degeneracy (largest $k$ with non-empty $k$-core) & \prt & \keep\\
+spectral\_gap & algebraic connectivity (2nd-smallest Laplacian eigenvalue) & \prt & \keep\\
+\midrule
+\multicolumn{4}{l}{\textbf{\normalsize G. Cycles / rings}}\\
+\midrule
+n\_cycles & cyclomatic number $m-n+c$ & \cur & \keep\\
+ring\_sizes & histogram of minimum-cycle-basis ring lengths & \cur & \keep\\
+\midrule
+\multicolumn{4}{l}{\textbf{\normalsize H. Centrality --- graph-level scalar summaries}}\\
+\midrule
+mean\_betweenness & mean node betweenness centrality & \prt & \keep\\
+max\_betweenness & maximum node betweenness (top broker) & \nw & \keep\\
+mean\_closeness & mean closeness centrality & \prt & \keep\\
+mean\_eigenvector & mean eigenvector centrality & \prt & \keep\\
+max\_eigenvector & maximum eigenvector centrality & \nw & \keep\\
+\midrule
+\multicolumn{4}{l}{\textbf{\normalsize I. Node-level (per node; verbalized as named top-$k$, summarized as scalars for logreg)}}\\
+\midrule
+degree & node degree & \cur & \keep\\
+degree\_centrality & degree $/(n-1)$ & \prt & \keep\\
+clustering & per-node local clustering & \prt & \keep\\
+betweenness & per-node betweenness & \cur & \keep\\
+closeness & per-node closeness & \prt & \keep\\
+eigenvector & per-node eigenvector centrality & \cur & \keep\\
+pagerank & per-node PageRank & \prt & \keep\\
+kcore\_number & per-node $k$-core index & \prt & \keep\\
+mean\_neighbor\_degree & average degree of a node's neighbors & \prt & \keep\\
+\midrule
+\multicolumn{4}{l}{\textbf{\normalsize J. Null-model contrasts (named baselines; analytic where possible, else seeded rewiring)}}\\
+\midrule
+er\_clustering\_ratio & observed clustering $/$ ER baseline ($=$ density) & \nw & \keep\\
+config\_clustering\_ratio & observed clustering $/$ configuration-model expectation $(\langle k^2\rangle-\langle k\rangle)^2/(n\langle k\rangle^3)$; report $z$ & \nw & \keep\\
+config\_assortativity\_dev & observed assortativity minus configuration-model expectation ($\approx 0$) & \nw & \keep\\
+smallworld\_sigma & $\sigma=(C/C_{\text{rand}})/(L/L_{\text{rand}})$ & \nw & \keep\\
+smallworld\_omega & $\omega=L_{\text{rand}}/L - C/C_{\text{latt}}$ & \nw & \keep\\
+\bottomrule
+\end{longtable}
+\normalsize
+
+\medskip
+\noindent\textbf{Null models --- what we mean.} A null model is not unique: it is a
+randomized ensemble that fixes some properties and shuffles the rest; the choice of what
+to fix defines the question. graphlex never claims ``the'' null --- it reports each
+beyond-chance statistic against \emph{named} standard nulls and states which:
+\textbf{ER} $G(n,m)$ (fix node+edge counts) and the \textbf{configuration model} (fix the
+exact degree sequence --- the principled default, since it controls for the degree
+distribution). Compute analytically where a closed form exists (ER clustering $=$
+density; Newman's configuration-model clustering; modularity $Q$ is already a
+configuration-null contrast), else by seeded degree-preserving rewiring
+($\sim$200 double-edge swaps) giving mean $\pm$ std and a $z$-score. At small $n$ the
+null variance is large --- always emit the caveat.
+
+\medskip
+\noindent\textbf{Small-$n$ honesty.} Several features (power-law fit, null-model
+$z$-scores, modularity) are unreliable on tiny graphs. The finalized verbalizer must
+attach an explicit caveat (e.g.\ ``$n=30$ --- too small to confirm a power law'') rather
+than report a bare number.
+
+\medskip
+\noindent\textbf{To finalize:} tick \keep, strike rejects, add anything missing, and flag
+any feature that should be \emph{node-level only} vs.\ \emph{graph-level scalar} vs.\ both.
+
+\end{document}
