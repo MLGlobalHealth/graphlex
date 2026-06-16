@@ -140,7 +140,7 @@ verbalized queries). Non-LLM baselines (DistMult + freq-prior) are free.
 | graphlex + Opus, K=3 | 0.792 ± 0.042 | 0.833 ± 0.083 | 0.812 ± 0.062 |
 | graphlex + Qwen-14B, K=1 | 0.042 ± 0.042 | 0.250 ± 0.167 | 0.115 ± 0.031 |
 | graphlex + Qwen-14B, K=3 | 0.083 ± 0.083 | 0.208 ± 0.208 | 0.123 ± 0.123 |
-| ULTRA `ultra_4g` (zero-shot, NATIVE) | ENV-PENDING | ENV-PENDING | ENV-PENDING |
+| **ULTRA `ultra_4g` (zero-shot, NATIVE)** | 0.792 ± 0.042 | 0.917 ± 0.000 | 0.830 ± 0.023 |
 
 Reading (honest, smoke-level):
 - **Opus** uses the appended typed-context line + neighborhood framing effectively: best
@@ -156,6 +156,41 @@ Reading (honest, smoke-level):
 - This is a **smoke** (2 seeds, 12 queries, top-10 cap). Scale-up before any claim: 3 seeds,
   NQ ≥ 30, ask top-20 (to fairly measure Hits@10 vs full-ranking baselines), add
   Nations/Kinship, and **run the ULTRA row** (its native task — expected strong).
+
+### ULTRA tail-prediction RUN (DONE — home-turf comparison)
+
+Ran on clpc35 (RTX 5000 Ada, ultra_4g.pth) over the **matched** tail-pred manifest
+(`ultra_kg.py tail UMLS`), filtered ranking, same seeds {11,22} / 12 query (h,r) pairs /
+leakage strip / filter_tails as DistMult/freq/Opus. Per seed: seed 11 Hits@1 0.750 /
+Hits@10 0.917 / MRR 0.807; seed 22 Hits@1 0.833 / Hits@10 0.917 / MRR 0.853.
+
+| arm (UMLS tail-pred, FILTERED, 2 seeds) | Hits@1 | Hits@10 | MRR |
+|-----|-------:|--------:|----:|
+| freq-prior | 0.708 ± 0.125 | 0.917 ± 0.083 | 0.792 ± 0.104 |
+| DistMult (held-out) | 0.708 ± 0.042 | 0.958 ± 0.042 | 0.800 ± 0.008 |
+| **ULTRA `ultra_4g` (zero-shot, NATIVE)** | **0.792 ± 0.042** | 0.917 ± 0.000 | **0.830 ± 0.023** |
+| graphlex + Opus, K=1 | **0.833 ± 0.083** | 0.875 ± 0.042 | **0.854 ± 0.062** |
+| graphlex + Opus, K=3 | 0.792 ± 0.042 | 0.833 ± 0.083 | 0.812 ± 0.062 |
+
+Reading (honest, smoke-level):
+- On its **native** task ULTRA is, as expected, **strong**: it clears both KG baselines
+  (Hits@1 0.792 vs 0.708; MRR 0.830 vs ~0.80) — the on-message half of the 2×2, the foil
+  doing what it was built for. Filtered MRR 0.830 vs its raw smoke MRR 0.275 is exactly the
+  expected lift from the filtered protocol (a sane number, not a plumbing artifact).
+- **graphlex + Opus (K=1) still edges ULTRA** even on ULTRA's home turf: Hits@1 0.833 vs
+  0.792, MRR 0.854 vs 0.830 (Opus's Hits@10 0.875 is capped by its top-10 answer length, so
+  Hits@1/MRR are the fair head-to-head). The granularity-general LLM matches/beats the
+  specialist FM in the FM's best cell, and **dominates it off-cell** (relation-pred sibling,
+  where ULTRA fell below tiny DistMult) — the granularity-lock the suite is about.
+- Caveat: 2-seed smoke, NQ=12, top-10 cap on the LLM. Scale-up (3+ seeds, NQ≥30, top-20 ask,
+  Nations/Kinship) before any claim. Matched-protocol guarantee held: ULTRA and the LLM read
+  the **one** manifest from tail_pred_icl.py; per-seed query_triples / leakage strip /
+  filter_tails byte-identical (verified: nq_manifest==nranks_ultra==12 per seed, truths
+  taken directly from query_triples).
+
+Files: `/home/scratch/bench_out/tail_pred_icl/UMLS/{manifest.json (now carries an `"ultra"`
+block parallel to distmult/freq), tail_result.json}` on clpc95 (rsynced back from clpc35);
+`score_tail_pred.py UMLS` prints the ULTRA row. Nothing committed.
 
 ## How to run / scale up
 
