@@ -217,3 +217,28 @@ Files: `eval/ultra_kg.py` (the runner — clpc35-local copy at
 `/home/scratch/bench_out/kg_icl/UMLS/ultra_result.json` and spliced into `manifest.json`
 under an `"ultra"` block (parallel to `"distmult"`); `score_kg_icl.py` now prints the
 ULTRA row from that block. Repo/venv/weights kept clpc35-local; nothing committed.
+
+## CORRECTED FULLER RESULTS (2026-06-16) — relation prediction, 5 seeds × NQ=40
+
+Bug fixed: the first fuller Opus pass kept stale 12-query smoke `.ans` for 3 cells
+(REDO_UNPARSED only re-runs *unparseable* files, but a 12-line smoke answer parses, so
+it was scored against the new 40-query truth → spurious ±0.25 variance). Deleted any
+`.ans` with <NQ parsed lines and re-answered; all 15/15 cells now have full 40-query
+coverage. Lesson: the redo check must compare parsed-line count to NQ, not just
+parseability.
+
+UMLS relation prediction, balanced accuracy (chance 0.022), mean ± std over seeds
+[11,22,33,44,55]:
+
+| arm | bal-acc |
+|---|---|
+| freq-prior | 0.054 ± 0.005 |
+| ULTRA (ultra_4g, zero-shot, matched) | 0.206 ± 0.040 |
+| DistMult (KG-emb) | 0.356 ± 0.096 |
+| graphlex+Opus K=1 | 0.586 ± 0.064 |
+| graphlex+Opus K=3 | 0.586 ± 0.052 |
+| graphlex+Opus K=5 | 0.611 ± 0.032 |
+
+graphlex+Opus ~1.7× DistMult and ~3× ULTRA. Combined with the tail-prediction (smoke)
+result where Opus also edges ULTRA on its native task, graphlex+LLM wins both KG cells.
+(Opus relation-pred cost: 15 prompts ≈ 350K input tokens, as estimated/approved.)
