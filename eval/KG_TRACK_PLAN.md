@@ -76,7 +76,7 @@ over seeds.
 | **freq-prior** | predict the globally most-common relation | n/a | RUN (floor) |
 | **DistMult (KG-emb)** | numpy DistMult `score(h,r,t)=Σ e_h·w_r·e_t`, tiny epoch budget; relation prediction = `argmax_r` / rank over `R`; trained on observed triples only | KG (typed edge) | RUN |
 | **graphlex + LLM** | typed-neighborhood verbalization → Qwen-2.5-14B / Opus, K-shot ICL | **none** (spans all 4 granularities) | RUN (smoke) |
-| **ULTRA (zero-shot)** | the FM foil | KG link/relation | **ENV-PENDING** (see below) |
+| **ULTRA (zero-shot)** | the FM foil (`ultra_4g`) | KG link/relation | **DONE** (5-seed: see below) |
 
 DistMult hyperparameters (`dim=64, epochs=300, lr=0.05`) picked by a quick sweep on UMLS
 train-triple relation recovery (knee: bal-acc ~0.5, Hits@1 ~0.48, MRR ~0.65). On the
@@ -148,3 +148,72 @@ python eval/score_kg_icl.py UMLS
 Files: `eval/kg_icl.py` (generator + DistMult/freq baselines, no LLM),
 `eval/score_kg_icl.py` (scorer, reuses `_common`), prompts/manifest under
 `/home/scratch/bench_out/kg_icl/UMLS/`.
+
+## ULTRA results (DONE — was ENV-PENDING)
+
+ULTRA is now run as the specialist FM foil, on the **GPU box clpc35** (RTX 5000 Ada
+32 GB; `/home/scratch` is clpc35-local, not shared with clpc95 — data/manifest rsync'd
+over, results rsync'd back). No LLM tokens.
+
+**Checkpoint:** `ultra_4g.pth` (pretrained on FB15k237 + WN18RR + CoDExMedium + NELL995,
+400 K steps; from the repo's `/ckpts`). Chosen over `ultra_3g` for inductive transfer
+(4 pretraining graphs incl. NELL995; README notes inductive performance is comparable
+across 3g/4g, and `ultra_50g` is recommended only for *larger* graphs — UMLS is tiny).
+
+**Smoke validation (PASSED).** On the full UMLS graph (train+valid as the inference
+graph), TAIL prediction for 100 held-out *test* triples (rank true tail among all 135
+entities): **MRR 0.275, Hits@1 0.160, Hits@10 0.550** vs random MRR ≈ 0.0147 / random
+Hits@10 ≈ 0.074 — i.e. ~19× chance MRR, ~7× chance Hits@10. The checkpoint loads and
+does sane zero-shot inductive KG reasoning on UMLS, so the downstream numbers are
+trustworthy. (Sanity-floor guard: the runner STOPs and reports rather than emitting
+relation-prediction numbers if this smoke does not clear random.)
+
+**Matched protocol (essential).** ULTRA consumes the **manifest** written by
+`kg_icl.py`: per seed it reads that seed's `query_triples` + `support_triples`, strips
+those `(h,t)` pairs (undirected) from the observed graph (same leakage rule as DistMult /
+the LLM arms), and scores **the same query pairs**. Verified per-seed (all 5) that
+ULTRA's query truths are **byte-identical** to the manifest's `query_triples` relations.
+Same seeds {11, 22, 33, 44, 55}, same NQ=40, same leakage-stripped graph. Relation
+prediction = for each query `(h,t)` score all 46 candidate relations via ULTRA's
+`(h, r, t)` triple score (one batch row per candidate so each candidate's own relation
+drives its relation representation), `argmax_r` → prediction, rank of true `r` → Hits@1 /
+MRR; balanced acc = macro per-relation-class recall (same `_common.bal_acc` definition).
+
+**Results — FULLER RUN (UMLS, 5 seeds, NQ=40, balanced accuracy primary; chance 0.022).**
+Supersedes the old 2-seed/NQ=12 smoke (which read bal-acc 0.222 ± 0.056 / Hits@1 0.250 /
+MRR 0.375); re-run 2026-06-16 on the regenerated manifest so all arms (Opus/DistMult/
+freq-prior/ULTRA) share the identical seeds {11,22,33,44,55} and the same 40 query pairs.
+
+| arm | bal-acc | Hits@1 | MRR |
+|-----|--------:|-------:|----:|
+| freq-prior | 0.054 ± 0.005 | — | — |
+| **ULTRA `ultra_4g` (zero-shot)** | **0.206 ± 0.040** | 0.195 ± 0.029 | 0.334 ± 0.026 |
+| DistMult (held-out query pairs) | 0.356 ± 0.096 | 0.320 ± 0.103 | 0.483 ± 0.082 |
+
+Per-seed ULTRA bal-acc: 0.159 / 0.180 / 0.192 / 0.231 / 0.270 (seeds 11/22/33/44/55).
+
+Reading (honest): on the fuller, matched 5-seed run ULTRA's ranking is essentially
+unchanged from the smoke and the story holds — it clears the freq-prior floor (0.206 vs
+0.054) and the smoke confirms it reasons on UMLS, but on **relation** prediction it lands
+**below the tiny DistMult baseline** (0.206 vs 0.356) and well below graphlex+Opus. This
+is expected and on-message: ULTRA is built and pretrained for **tail/entity ranking given
+a relation** (where it is strong here, MRR 0.275 over 135 entities in the smoke), and the
+relation-prediction slot-in (rank the 46 relations for a fixed entity pair) is off its
+native objective — exactly the granularity-lock the suite is about. graphlex+LLM spans
+this typed-edge granularity in the same results table while the specialist FM is pinned to
+its home task. (Opus K-shot numbers from the regenerated arm: see `score_kg_icl.py UMLS`.)
+
+**Env recipe (clpc35).** Reused `/home/scratch/gpfn_venv` (torch 2.4.0+cu118, PyG 2.8.0,
+torch_scatter, `ninja` python pkg — all present). ULTRA cloned to
+`/home/scratch/ultra_work/ULTRA`. The `rspmm` CUDA extension was JIT-compiled on the prior
+run and its `rspmm.so` is cached at `~/.cache/torch_extensions/py312_cu118/rspmm/`; torch's
+`verify_ninja_availability()` shells out to `ninja --version`, so the **venv bin must be on
+PATH** even though the python is invoked by absolute path. The fuller re-run (2026-06-16)
+used simply:
+`PATH=/home/scratch/gpfn_venv/bin:$PATH /home/scratch/gpfn_venv/bin/python ultra_kg.py {smoke|run} UMLS` (cwd `/home/scratch/ultra_work`). No reinstall, no recompile.
+
+Files: `eval/ultra_kg.py` (the runner — clpc35-local copy at
+`/home/scratch/ultra_work/ultra_kg.py`); results in
+`/home/scratch/bench_out/kg_icl/UMLS/ultra_result.json` and spliced into `manifest.json`
+under an `"ultra"` block (parallel to `"distmult"`); `score_kg_icl.py` now prints the
+ULTRA row from that block. Repo/venv/weights kept clpc35-local; nothing committed.

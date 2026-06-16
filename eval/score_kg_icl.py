@@ -47,6 +47,7 @@ def main(dataset):
     ch = man['chance']
     reps = man.get('representations', ['readable'])
     dm = man.get('distmult', {}); fp = man.get('freq_prior', {})
+    ul = man.get('ultra', {})
     print(f"\n=== {dataset} KG-ICL / relation prediction "
           f"(entities={man['n_entities']}, relations={man['n_relations']}, "
           f"bal-acc chance-floor {ch:.3f}, khop={man['khop']}, BALANCED acc, "
@@ -58,8 +59,14 @@ def main(dataset):
           f"{_fmt(dm.get('hits1', [])):>14} {_fmt(dm.get('mrr', [])):>14}")
     print(f"  {'freq-prior':>18} {_fmt(fp.get('bal_acc', [])):>14} "
           f"{'(n/a)':>14} {'(n/a)':>14}")
-    print(f"  {'ULTRA (zero-shot)':>18} {'ENV-PENDING':>14} {'ENV-PENDING':>14} "
-          f"{'ENV-PENDING':>14}   <- see KG_TRACK_PLAN.md")
+    if ul:
+        ck = ul.get('checkpoint', 'ultra')
+        print(f"  {('ULTRA (' + ck.replace('.pth','') + ')'):>18} "
+              f"{_fmt(ul.get('bal_acc', [])):>14} {_fmt(ul.get('hits1', [])):>14} "
+              f"{_fmt(ul.get('mrr', [])):>14}   <- zero-shot, matched query pairs/seeds")
+    else:
+        print(f"  {'ULTRA (zero-shot)':>18} {'ENV-PENDING':>14} {'ENV-PENDING':>14} "
+              f"{'ENV-PENDING':>14}   <- see KG_TRACK_PLAN.md")
     # LLM arms (balanced accuracy), per rep
     for rep in reps:
         opus = llm_scores(man, 'opus', rep)

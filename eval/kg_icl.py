@@ -80,6 +80,8 @@ DM_NEG = 4                       # negative samples per positive
 
 if os.environ.get('SMOKE'):
     SEEDS, K_SHOTS, NQ = [11, 22], [1, 3], 12
+if os.environ.get('FULL'):
+    SEEDS, K_SHOTS, NQ = [11, 22, 33, 44, 55], [1, 3, 5], 40
 
 
 # --- KG loading ---------------------------------------------------------------
