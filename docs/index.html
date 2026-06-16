@@ -22,7 +22,7 @@
           border: 1px solid #cbd5e0; border-radius: 7px; font-family: inherit; }
   textarea { resize: vertical; }
   .row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-  .results { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+  .results { display: grid; grid-template-columns: 1fr; gap: 18px; align-items: start; }
   button { margin-top: 12px; padding: 9px 16px; font-size: 14px; font-weight: 600;
            border: none; border-radius: 8px; background: var(--accent); color: #fff; cursor: pointer; }
   button:disabled { opacity: .55; cursor: default; }
@@ -140,7 +140,7 @@
       <div class="results">
         <div>
           <div class="badge nx">NetworkX spring layout</div>
-          <svg id="graph" viewBox="0 0 400 360" preserveAspectRatio="xMidYMid meet"></svg>
+          <svg id="graph" viewBox="0 0 400 360" preserveAspectRatio="xMidYMid meet" style="max-width:460px;width:100%;height:auto;display:block"></svg>
           <details><summary>Show raw facts() structure (JSON)</summary><pre id="facts"></pre></details>
         </div>
         <div>
