@@ -113,8 +113,6 @@
           <textarea id="attrs" rows="2" placeholder="0:A, 1:A, 2:B, 3:B" onchange="run()"></textarea>
         </div>
       </div>
-      <button id="go" onclick="run()">Re-run / apply pasted graph</button>
-      <span class="muted">&nbsp; Examples &amp; pasted graphs update automatically; this button just forces a re-run.</span>
       <div class="badge nx" style="margin-top:12px">NetworkX spring layout</div>
       <svg id="graph" viewBox="0 0 400 360" preserveAspectRatio="xMidYMid meet" style="max-width:460px;width:100%;height:auto;display:block"></svg>
     </div>
@@ -150,10 +148,10 @@
         </div>
       </div>
       <div class="openrow">
-        <span class="muted">Copy, then paste into:</span>
-        <a href="https://chatgpt.com/" target="_blank" rel="noopener">Open ChatGPT ↗</a>
-        <a href="https://claude.ai/new" target="_blank" rel="noopener">Open Claude ↗</a>
-        <a href="https://gemini.google.com/app" target="_blank" rel="noopener">Open Gemini ↗</a>
+        <span class="muted">Open (prefills ChatGPT &amp; Claude when short; always copies as a fallback):</span>
+        <a href="#" onclick="openIn('chatgpt');return false">Open ChatGPT ↗</a>
+        <a href="#" onclick="openIn('claude');return false">Open Claude ↗</a>
+        <a href="#" onclick="openIn('gemini');return false">Open Gemini ↗</a>
       </div>
       <details style="margin-top:12px"><summary>Show raw facts() structure (JSON)</summary><pre id="facts"></pre></details>
       <p class="muted">The model only ever sees the verbalized facts above &mdash; never the raw graph.
@@ -604,7 +602,7 @@ function run() {
   if (document.getElementById('example').value === 'custom'
       && !document.getElementById('edges').value.trim()) return;  // custom selected, nothing pasted yet
   const btn = document.getElementById('go');
-  btn.disabled = true; btn.textContent = "Computing…";
+  if (btn) { btn.disabled = true; btn.textContent = "Computing…"; }
   try {
     const feats = Array.from(document.querySelectorAll('.grp:checked:not(:disabled)')).map(c=>c.value).join('');
     const res = analyzeFn(
@@ -635,7 +633,7 @@ function run() {
   } catch (e) {
     alert("Error: " + e);
   } finally {
-    btn.disabled = false; btn.textContent = "Re-run / apply pasted graph";
+    if (btn) { btn.disabled = false; btn.textContent = "Re-run / apply pasted graph"; }
   }
 }
 
@@ -692,6 +690,19 @@ function fb(txt, done) {
   const ta = document.createElement('textarea'); ta.value = txt;
   ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select();
   try { document.execCommand('copy'); done(); } catch(e){} document.body.removeChild(ta);
+}
+
+// Open the prompt directly in a chatbot: prefill via ?q= for ChatGPT/Claude when the URL
+// is short enough, else open plain. Always copy first so paste is a guaranteed fallback.
+function openIn(svc) {
+  const prompt = buildPrompt(lastVerb, document.getElementById('question').value, lastIsNode);
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(prompt).catch(()=>{});
+  const enc = encodeURIComponent(prompt), short = enc.length < 6000;
+  let url;
+  if (svc === 'chatgpt') url = short ? 'https://chatgpt.com/?q=' + enc : 'https://chatgpt.com/';
+  else if (svc === 'claude') url = short ? 'https://claude.ai/new?q=' + enc : 'https://claude.ai/new';
+  else url = 'https://gemini.google.com/app';
+  window.open(url, '_blank', 'noopener');
 }
 
 boot();
