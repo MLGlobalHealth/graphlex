@@ -35,7 +35,7 @@
           border-radius:8px; padding:12px; font-size:13px; }
   .ctxlabel { font-size:12px; font-weight:700; color:#dd6b20; margin:14px 0 4px; }
   .promptwrap { position: relative; }
-  .prompt { white-space: pre-wrap; background:#fffaf0; border:1px solid #feebc8;
+  .prompt { background:#fffaf0; border:1px solid #feebc8;
             border-radius:8px; padding:12px; padding-top:34px; font-size:13px; }
   .copybtn { position:absolute; top:6px; right:6px; font-size:12px; cursor:pointer;
              background:#fff; color:#c05621; border:1px solid #feb2a8; border-radius:6px;
@@ -119,6 +119,7 @@
 
     <div id="out" class="card hidden">
       <h2>2. Deterministic analysis (no LLM)</h2>
+      <div class="badge det" style="margin-bottom:10px">Computed by NetworkX + graphlex &mdash; deterministic, no LLM</div>
       <details open style="margin:0 0 12px">
         <summary>Feature groups to compute &amp; verbalize <span class="muted">(all on by default; toggling re-runs)</span></summary>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:5px 18px;margin-top:8px;font-size:0.9em">
@@ -139,12 +140,11 @@
       <div class="promptwrap">
         <button class="copybtn" onclick="copyPrompt(this)">Copy</button>
         <div class="prompt">
-          <div id="promptPre" style="opacity:.55"></div>
-          <div class="badge det" style="margin:10px 0 4px">Computed by NetworkX + graphlex &mdash; deterministic, no LLM</div>
+          <div id="promptPre" style="opacity:.55;white-space:pre-wrap"></div>
           <div id="promptVerb" style="white-space:pre-wrap"></div>
           <div style="opacity:.55;margin-top:10px">Question:</div>
           <textarea id="question" rows="2" placeholder="Ask the LLM about this network…" style="width:100%;box-sizing:border-box;font:inherit;white-space:pre-wrap;border:1px solid #cbd5e0;border-radius:4px;padding:6px;margin-top:4px;background:#fff;resize:vertical"></textarea>
-          <div id="promptPost" style="opacity:.55;margin-top:10px"></div>
+          <div id="promptPost" style="opacity:.55;margin-top:10px;white-space:pre-wrap"></div>
         </div>
       </div>
       <div class="openrow">
