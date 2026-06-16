@@ -612,7 +612,7 @@ function run() {
   const btn = document.getElementById('go');
   btn.disabled = true; btn.textContent = "Computing…";
   try {
-    const feats = Array.from(document.querySelectorAll('.grp:checked')).map(c=>c.value).join('');
+    const feats = Array.from(document.querySelectorAll('.grp:checked:not(:disabled)')).map(c=>c.value).join('');
     const res = analyzeFn(
       document.getElementById('example').value,
       document.getElementById('edges').value,
@@ -621,6 +621,12 @@ function run() {
       feats);
     const d = JSON.parse(res);
     if (d.error) { alert(d.error); return; }
+    // Group K (per-node detail) is unavailable for graphs with > 50 nodes: gray it out.
+    const Kbox = document.querySelector('.grp[value="K"]');
+    const bigK = d.nodes && d.nodes.length > 50;
+    Kbox.disabled = bigK;
+    Kbox.closest('label').style.opacity = bigK ? 0.45 : '';
+    Kbox.closest('label').title = bigK ? 'Per-node detail is unavailable for graphs with more than 50 nodes' : '';
     document.getElementById('out').classList.remove('hidden');
     document.getElementById('verb').textContent = d.verbalization;
     document.getElementById('facts').textContent = d.facts_json;
