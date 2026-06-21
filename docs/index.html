@@ -164,101 +164,33 @@
      script tag so backslashes/newlines survive verbatim. -->
 <script type="text/python" id="pycode">
 import json, networkx as nx, numpy as np
-from graphlex import facts, verbalize
+from graphlex import facts, verbalize, GROUPS
 
-# ---- webapp-local PREVIEW of the finalized facts() candidate features (FACTS_FEATURES.tex,
-# groups A-J). Computed in-browser with networkx/numpy/scipy; NOT the library wheel's
-# verbalize() (which is unchanged). Deterministic, no LLM. Groups toggled in the UI. ----
-def _gini(x):
-    x=np.sort(np.asarray(x,float)); nn=len(x)
-    if nn==0 or x.sum()==0: return 0.0
-    return float((2*np.sum((np.arange(1,nn+1))*x)/(nn*x.sum()))-(nn+1)/nn)
-
-def _topk(d,k=5):
-    return ", ".join(f"{v} ({d[v]:.3g})" for v in sorted(d,key=lambda x:d[x],reverse=True)[:k])
-
-PERNODE_CAP=50   # group K: list every node up to this many; else summarize
-
+# ---- The web demo uses the SAME library facts()/verbalize() as the Python eval
+# scripts (single source of truth — graphlex.core.facts.GROUPS, FEATURE_VERSION).
+# facts() computes the canonical A-K feature set; verbalize(groups=...) renders only
+# the UI-selected groups (and node attributes when present). Deterministic, no LLM. ----
 def candidate_analyze(G, attr=None, enabled="ABCDEFGHIJK"):
-    """Return (prose, json-dict). Both respect the enabled-group set, so the
-    'raw facts() (JSON)' pane mirrors the verbalization exactly (option b)."""
-    E=set(enabled); txt=[]; D={}
-    n,m=G.number_of_nodes(),G.number_of_edges()
-    if n==0: return "Empty graph.", {}
-    deg=dict(G.degree()); dega=np.array([deg[v] for v in G],float)
-    dens=nx.density(G); ac=nx.average_clustering(G)
-    Gc=G.subgraph(max(nx.connected_components(G),key=len))
-    bc=nx.betweenness_centrality(G) if n>2 else {v:0.0 for v in G}
-    try: eig={v:float(x) for v,x in nx.eigenvector_centrality_numpy(G).items()} if m else {v:0.0 for v in G}
-    except Exception: eig={v:0.0 for v in G}
-    clo=nx.closeness_centrality(G)
-    comms=list(nx.community.greedy_modularity_communities(G)) if m else [set(G)]
-    node2c={v:i for i,c in enumerate(comms) for v in c}
-    if "A" in E:
-        D["A_size"]={"nodes":n,"edges":m,"density":round(dens,3),"components":nx.number_connected_components(G)}
-        txt.append(f"Size & connectivity: {n} nodes, {m} edges, density {dens:.2f}, {nx.number_connected_components(G)} connected component(s).")
-    if "B" in E:
-        mu,sd=dega.mean(),dega.std()
-        sk=float(np.mean(((dega-mu)/sd)**3)) if sd>0 else 0.0
-        ku=float(np.mean(((dega-mu)/sd)**4)-3) if sd>0 else 0.0
-        alpha=1+n/np.sum(np.log(dega/0.5)) if np.all(dega>0) else float('nan')
-        D["B_degree"]={"mean":round(mu,2),"max":int(dega.max()),"std":round(sd,2),"max_over_mean":round(dega.max()/mu,2),"skewness":round(sk,2),"kurtosis":round(ku,2),"gini":round(_gini(dega),2),"powerlaw_alpha_rough":round(alpha,2)}
-        txt.append(f"Degree distribution: mean {mu:.1f}, max {int(dega.max())}, std {sd:.1f}, max/mean {dega.max()/mu:.1f}; skewness {sk:.2f}, kurtosis {ku:.2f}, Gini {_gini(dega):.2f}; rough power-law exponent ~{alpha:.1f} (x_min=1; unreliable for small n).")
-    if "C" in E:
-        ntri=sum(nx.triangles(G).values())//3
-        nsq=int(round((np.trace(np.linalg.matrix_power(nx.to_numpy_array(G),4))-2*np.sum(dega**2)+2*m)/8)) if n<=400 else None
-        D["C_clustering"]={"avg_clustering":round(ac,3),"transitivity":round(nx.transitivity(G),3),"triangles":ntri,"squares":nsq}
-        txt.append(f"Clustering & cohesion: avg clustering {ac:.2f}, transitivity {nx.transitivity(G):.2f}; {ntri} triangles, {(str(nsq)+' 4-cycles') if nsq is not None else '4-cycle count skipped (large)'}.")
-    if "D" in E and Gc.number_of_nodes()>1:
-        apl=nx.average_shortest_path_length(Gc); diam=nx.diameter(Gc); rad=nx.radius(Gc)
-        D["D_distances"]={"avg_path_length":round(apl,2),"diameter":diam,"radius":rad}
-        txt.append(f"Distances (largest component): avg path length {apl:.2f}, diameter {diam}, radius {rad}.")
-    if "E" in E and m:
-        try: asrt=nx.degree_assortativity_coefficient(G)
-        except Exception: asrt=float('nan')
-        Q=nx.community.modularity(G,comms)
-        D["E_mixing"]={"degree_assortativity":round(asrt,2),"n_communities":len(comms),"modularity":round(Q,2)}
-        txt.append(f"Mixing & community: degree assortativity {asrt:+.2f}; {len(comms)} communities (modularity Q = {Q:.2f}).")
-    if "F" in E:
-        kc=max(nx.core_number(G).values()) if m else 0
-        try: sg=float(nx.algebraic_connectivity(Gc)) if Gc.number_of_nodes()>1 else 0.0
-        except Exception: sg=float('nan')
-        D["F_cores_spectral"]={"max_kcore":kc,"spectral_gap":round(sg,3)}
-        txt.append(f"Cores & spectral: degeneracy (max k-core) {kc}; algebraic connectivity {sg:.3f}.")
-    if "G" in E:
-        ncyc=m-n+nx.number_connected_components(G); D["G_cycles"]={"n_cycles":ncyc}
-        txt.append(f"Cycles: {ncyc} independent cycles (cyclomatic number).")
-    if "H" in E and n>2:
-        D["H_centrality"]={"betweenness_mean":round(float(np.mean(list(bc.values()))),3),"betweenness_max":round(max(bc.values()),3),"closeness_mean":round(float(np.mean(list(clo.values()))),2),"eigenvector_mean":round(float(np.mean(list(eig.values()))),2),"eigenvector_max":round(max(eig.values()),2)}
-        txt.append(f"Centrality (graph summaries): betweenness mean {np.mean(list(bc.values())):.3f} / max {max(bc.values()):.3f}; closeness mean {np.mean(list(clo.values())):.2f}; eigenvector mean {np.mean(list(eig.values())):.2f} / max {max(eig.values()):.2f}.")
-    if "I" in E:
-        D["I_key_nodes"]={"top_degree":[str(v) for v in sorted(deg,key=lambda x:deg[x],reverse=True)[:5]],"top_betweenness":[str(v) for v in sorted(bc,key=lambda x:bc[x],reverse=True)[:5]],"top_eigenvector":[str(v) for v in sorted(eig,key=lambda x:eig[x],reverse=True)[:5]]}
-        txt.append(f"Key nodes: most connected {_topk(deg)}; top brokers (betweenness) {_topk(bc)}; most central (eigenvector) {_topk(eig)}.")
-    if "J" in E and m and n>2:
-        km=dega.mean(); k2=(dega**2).mean()
-        Cc=(k2-km)**2/(n*km**3) if km>0 else 0.0
-        Lr=np.log(n)/np.log(km) if km>1 else float('nan')
-        try: L=nx.average_shortest_path_length(Gc)
-        except Exception: L=float('nan')
-        Cl=3*(km-2)/(4*(km-1)) if km>1 else float('nan')
-        sigma=(ac/dens)/(L/Lr) if (dens>0 and L and Lr==Lr) else float('nan')
-        omega=(Lr/L-ac/Cl) if (L and Cl==Cl and Cl) else float('nan')
-        rC=(ac/Cc) if Cc>0 else float('nan')
-        D["J_null_model"]={"er_clustering_ratio":round(ac/dens,2) if dens>0 else None,"config_clustering":round(Cc,2),"config_clustering_ratio":round(rC,2) if Cc>0 else None,"smallworld_sigma":round(sigma,2),"smallworld_omega":round(omega,2)}
-        txt.append(f"Null-model contrasts: clustering {ac:.2f} vs ER {dens:.2f} ({ac/dens:.1f}x) and configuration model {Cc:.2f} ({rC:.1f}x); small-world sigma {sigma:.2f}, omega {omega:.2f}. (small n -> wide.)")
+    """Return (verbalized prose, json-dict). Both respect the enabled-group set, so
+    the 'raw facts() (JSON)' pane mirrors the verbalization the LLM sees."""
+    if G.number_of_nodes()==0: return "Empty graph.", {}
+    E=set(enabled)
+    f=facts(G, node_attrs=([attr] if attr else None))
+    verb=verbalize(f, groups=enabled) or "(no feature groups selected)"
+    # JSON pane: selected scalar groups (A-H,J) + node-level (I,K) + node attributes.
+    s=f["structure"]; D={}
+    for g in "ABCDEFGHJ":
+        if g in E: D[g]={k:s.get(k) for k in GROUPS[g]}
+    nd=f.get("nodes") or {}
+    if "I" in E and nd.get("degree"):
+        D["I"]={"top_degree":[str(v) for v in nd["top_degree"]],
+                "top_betweenness":[str(v) for v in nd["top_betweenness"]],
+                "top_eigenvector":[str(v) for v in nd["top_eigenvector"]]}
     if "K" in E:
-        if n<=PERNODE_CAP:
-            per={}; lines=[]
-            for v in G:
-                nb=[str(u) for u in G.neighbors(v)]
-                per[str(v)]={"degree":deg[v],"betweenness":round(bc[v],3),"eigenvector":round(eig[v],3),"community":node2c[v],"neighbors":nb}
-                lines.append(f"  {v}: degree {deg[v]}, betweenness {bc[v]:.2f}, eigenvector {eig[v]:.2f}, community {node2c[v]}; neighbors: {', '.join(nb)}")
-            D["K_per_node"]=per
-            txt.append("Per-node detail (label: degree, betweenness, eigenvector, community; neighbors):\n"+"\n".join(lines))
-        else:
-            D["K_per_node"]={"note":f"omitted (n={n}>{PERNODE_CAP}); ask about a specific node's neighborhood instead"}
-            txt.append(f"Per-node detail omitted (n={n} > {PERNODE_CAP}); query a specific node's ego-graph instead.")
-    return ("\n".join(txt) if txt else "(no feature groups selected)"), D
+        D["K"]=nd.get("per_node") or {"note":"per-node detail omitted (graph too large)"}
+    if attr and f.get("attributes",{}).get(attr):
+        D["attributes"]={attr:f["attributes"][attr]}
+    return verb, D
 
 def _office():
     people = {"Alice":("Eng","snr"),"Bob":("Eng","jr"),"Carol":("Eng","jr"),"Dan":("Eng","jr"),

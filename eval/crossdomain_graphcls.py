@@ -25,7 +25,7 @@ from torch_geometric.utils import to_networkx
 
 import sys
 sys.path.insert(0, '/home/scratch/Dropbox/Seth/Research/MLGHrepos/graphlex')
-from graphlex import facts, verbalize
+from graphlex import facts, verbalize, feature_vector, feature_names, SCALAR_GROUPS
 
 TU_ROOT = '/home/scratch/tudata'
 EMB_DIR = '/home/scratch/real_fm_embeddings'
@@ -41,9 +41,9 @@ DATASETS = [
     ('NCI1',        'chemistry', 'nci1',     ['graphpfn', 'gmn']),
 ]
 
-FKEYS = ['n_nodes', 'n_edges', 'density', 'n_components', 'mean_degree', 'max_degree',
-         'degree_std', 'max_over_mean_degree', 'avg_clustering', 'transitivity',
-         'degree_assortativity', 'avg_path_length', 'diameter', 'n_communities']
+# Canonical feature set = graphlex A-K scalar groups (single source of truth).
+# (Previously a 14-key subset that dropped n_cycles; now unified with the library.)
+FKEYS = feature_names()
 
 
 def node_categories(data):
@@ -75,15 +75,8 @@ def composition_vec(cats, ncat):
     return (v / v.sum()).tolist() if v.sum() else v.tolist()
 
 
-def feat_vec(f):
-    s = f['structure']
-    v = []
-    for k in FKEYS:
-        x = s[k]
-        if x is None or (isinstance(x, float) and x != x):
-            x = 0.0
-        v.append(float(x))
-    return v
+def feat_vec(f, groups=SCALAR_GROUPS):
+    return feature_vector(f, groups)
 
 
 def load(name):

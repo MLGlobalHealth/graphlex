@@ -1,5 +1,34 @@
 # Feature-coverage / 4-way sync checklist (lab note, 2026-06-15)
 
+> **STATUS: RESOLVED 2026-06-21.** The registry fix below is implemented. Canonical
+> feature set = **groups A–K** (`graphlex.core.facts.GROUPS`, `FEATURE_VERSION="A-K/v1"`).
+> A single registry now feeds all consumers:
+> - `facts()` computes the full A–K set (B shape: skew/kurtosis/gini/power-law; C
+>   triangles/squares; D radius; E modularity value; F kcore/spectral_gap; H centrality
+>   scalar means+max; J ER/config/small-world null contrasts; I/K node-level).
+> - `verbalize(facts, groups=...)` renders the same set, group-selectable for ablations.
+> - `feature_vector(facts, groups=SCALAR_GROUPS)` is the **one** logreg builder.
+>   `eval/_common.py::fvec` and the generators (`sweep.py`, `zero_label.py`,
+>   `label_curve.py`, `crossdomain_graphcls.py`, `mutag_elements.py`) all import it —
+>   so logreg X and the LLM text carry the identical set by construction. The old
+>   15-key vector (and the 14-key crossdomain/mutag subset that dropped `n_cycles`)
+>   are gone; the canonical scalar vector is now 35-dim.
+> - The webapp calls the same library `facts()`/`verbalize()` (via the wheel) — no more
+>   webapp-local `candidate_analyze`.
+>
+> **Intentionally separate:** `make_verbalize_eval.py` and `synth_multiseed.py` are
+> self-contained synthetic-family experiments with their own `feats()`/inline
+> `verbalize()` and a raw-edgelist-permutation ablation arm; they do not consume the
+> library and are NOT part of this contract (converting them would change what that
+> experiment measures).
+>
+> **Consequence (flagged):** the logreg input vector changed, so all numbers in
+> CROSSDOMAIN/ZEROLABEL/LABEL_CURVE/SWEEP results must be regenerated; prior results are
+> the "before" (impoverished + LLM/logreg-mismatched) ablation.
+
+---
+
+
 **The integrity condition for the headline comparison.** The paper's core claim is
 "LLM reasoning over verbalized features vs. logreg over the *same* features." That is
 only coherent if **four things carry the identical feature set**:

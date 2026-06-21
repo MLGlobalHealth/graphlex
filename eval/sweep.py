@@ -19,7 +19,7 @@ from torch_geometric.datasets import TUDataset
 from torch_geometric.utils import to_networkx
 import sys
 sys.path.insert(0, '/home/scratch/Dropbox/Seth/Research/MLGHrepos/graphlex')
-from graphlex import facts, verbalize
+from graphlex import facts, verbalize, feature_vector, feature_names, SCALAR_GROUPS
 
 OUT = '/home/scratch/bench_out/sweep'
 PROBE = '/home/scratch/bench_out/probe_datasets.json'
@@ -32,15 +32,12 @@ SKIP_HUGE_AVGN = 150    # skip datasets whose graphs are enormous (cost); report
 SKIP_MANY_CLASS = 30    # skip datasets with too many classes for ICL (e.g. COIL-DEL=100)
 MAX_NCAT = 50           # above this, node features aren't usable as composition -> structure-only
 POOL_CAP = 4000         # only consider first N graphs (avoid iterating 100k-graph sets)
-FKEYS = ['n_nodes', 'n_edges', 'density', 'n_components', 'mean_degree', 'max_degree',
-         'degree_std', 'max_over_mean_degree', 'avg_clustering', 'transitivity',
-         'degree_assortativity', 'avg_path_length', 'diameter', 'n_cycles', 'n_communities']
+# Canonical feature set = graphlex A-K scalar groups (single source of truth).
+FKEYS = feature_names()
 
 
-def fvec(f):
-    s = f['structure']
-    return [0.0 if (s[k] is None or (isinstance(s[k], float) and s[k] != s[k])) else float(s[k])
-            for k in FKEYS]
+def fvec(f, groups=SCALAR_GROUPS):
+    return feature_vector(f, groups)
 
 
 def node_cats(data):

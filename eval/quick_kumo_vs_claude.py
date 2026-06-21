@@ -7,7 +7,7 @@ Emits the few-shot prompt for (3) + ground truth, and prints (1)/(2)."""
 import sys, json, numpy as np, networkx as nx
 sys.path.insert(0, '/home/scratch/Dropbox/Seth/Research/MLGHrepos/graphlex')
 sys.path.insert(0, 'src')
-from graphlex import facts, verbalize
+from graphlex import facts, verbalize, feature_vector
 from torch_geometric.datasets import TUDataset
 from torch_geometric.utils import to_networkx
 from sklearn.linear_model import LogisticRegression
@@ -29,8 +29,7 @@ i0 = list(rng.permutation(np.where(ys == 0)[0])); i1 = list(rng.permutation(np.w
 shot_idx = i0[:K] + i1[:K]
 query_idx = i0[K:K + M] + i1[K:K + M]; rng.shuffle(query_idx)
 
-FK = ['n_nodes', 'n_edges', 'density', 'mean_degree', 'max_degree', 'avg_clustering', 'n_communities']
-def feat(G): s = facts(G)['structure']; return [s[k] for k in FK]
+def feat(G): return feature_vector(facts(G))   # canonical A-K scalar vector
 
 def logreg(Xs, ysh, Xq, yq):
     sc = StandardScaler().fit(Xs)

@@ -24,7 +24,7 @@ from torch_geometric.datasets import TUDataset
 from torch_geometric.utils import to_networkx
 import sys
 sys.path.insert(0, '/home/scratch/Dropbox/Seth/Research/MLGHrepos/graphlex')
-from graphlex import facts, verbalize
+from graphlex import facts, verbalize, feature_vector, feature_names, SCALAR_GROUPS
 
 OUT = '/home/scratch/bench_out/mutag_elem2'
 SEEDS = [11, 22, 33]
@@ -32,15 +32,13 @@ SHOTS_PER_CLASS = 10
 N_QUERY = 40
 ATOMS = {0: 'Carbon', 1: 'Nitrogen', 2: 'Oxygen', 3: 'Fluorine',
          4: 'Iodine', 5: 'Chlorine', 6: 'Bromine'}
-FKEYS = ['n_nodes', 'n_edges', 'density', 'n_components', 'mean_degree', 'max_degree',
-         'degree_std', 'max_over_mean_degree', 'avg_clustering', 'transitivity',
-         'degree_assortativity', 'avg_path_length', 'diameter', 'n_communities']
+# Canonical feature set = graphlex A-K scalar groups (single source of truth).
+# (Previously a 14-key subset that dropped n_cycles; now unified with the library.)
+FKEYS = feature_names()
 
 
-def feat_vec(f):
-    s = f['structure']
-    return [0.0 if (s[k] is None or (isinstance(s[k], float) and s[k] != s[k])) else float(s[k])
-            for k in FKEYS]
+def feat_vec(f, groups=SCALAR_GROUPS):
+    return feature_vector(f, groups)
 
 
 def to_nx(d, cats, names):

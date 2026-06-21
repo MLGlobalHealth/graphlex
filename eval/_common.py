@@ -18,16 +18,30 @@ scripts, so a fix in one place fixes them all:
     facts() feature-vector extractor + node-category / composition helpers used to
     rebuild the classical (logreg) baseline at scoring time.
 
-NOTE: this is BEHAVIOR-PRESERVING. ``FKEYS``/``fvec``/``node_cats``/``to_nx``/
-``comp`` here are byte-for-byte the versions in ``sweep.py`` (the generator that
-produced the sweep prompts + manifest), so importing them in the scorers yields
-identical numbers.
+SINGLE SOURCE OF TRUTH: ``fvec``/``FKEYS`` now derive from the graphlex library's
+canonical feature registry (``graphlex.feature_vector`` over the A-K scalar groups,
+see ``graphlex.core.facts.GROUPS``). Generators (``sweep.py`` etc.) and scorers both
+import the same builder, so the logreg vector matches the verbalized text the LLM
+sees by construction. ``fvec(f, groups=...)`` is group-selectable for ablations.
+The feature version is ``graphlex.FEATURE_VERSION`` — record it in result manifests.
 """
+import os
 import re
+import sys
 
 import numpy as np
 import networkx as nx
 from torch_geometric.utils import to_networkx
+
+# graphlex library (the canonical feature registry). Importable on PYTHONPATH or
+# via the project root; insert it so scorers don't have to set PYTHONPATH.
+_GRAPHLEX_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _GRAPHLEX_ROOT not in sys.path:
+    sys.path.insert(0, _GRAPHLEX_ROOT)
+from graphlex import (  # noqa: E402
+    feature_vector as _feature_vector, feature_names,
+    GROUPS, SCALAR_GROUPS, ALL_GROUPS, FEATURE_VERSION,
+)
 
 # --- answer-line parsing -----------------------------------------------------
 # tolerant: handles "0 CLASS0", "Query 0 CLASS0", "0: CLASS0", "0) CLASS0",
@@ -71,17 +85,17 @@ def raw_acc(truth_list, pred_map):
 
 
 # --- graphlex facts() feature vector + node composition ----------------------
-# (identical to sweep.py / label_curve.py / zero_label.py)
-FKEYS = ['n_nodes', 'n_edges', 'density', 'n_components', 'mean_degree', 'max_degree',
-         'degree_std', 'max_over_mean_degree', 'avg_clustering', 'transitivity',
-         'degree_assortativity', 'avg_path_length', 'diameter', 'n_cycles', 'n_communities']
+# Canonical, group-selectable, from the library registry (A-K scalar groups).
+FKEYS = feature_names()   # ordered scalar feature names = the logreg columns
 
 
-def fvec(f):
-    """Fixed-length feature vector from a graphlex facts() dict (NaN/None -> 0.0)."""
-    s = f['structure']
-    return [0.0 if (s[k] is None or (isinstance(s[k], float) and s[k] != s[k])) else float(s[k])
-            for k in FKEYS]
+def fvec(f, groups=SCALAR_GROUPS):
+    """Canonical feature vector from a graphlex facts() dict (NaN/None -> 0.0).
+
+    Delegates to graphlex.feature_vector so this is byte-for-byte identical to the
+    vector built by the generators. Pass `groups` (a subset of 'ABCDEFGHJ') to
+    ablate by feature group."""
+    return _feature_vector(f, groups)
 
 
 def node_cats(data):

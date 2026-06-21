@@ -20,7 +20,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 import sys
 sys.path.insert(0, '/home/scratch/Dropbox/Seth/Research/MLGHrepos/graphlex')
-from graphlex import facts, verbalize
+from graphlex import facts, verbalize, feature_vector, feature_names, SCALAR_GROUPS
 
 OUT = '/home/scratch/bench_out/labelcurve'
 SEEDS = [11, 22, 33, 44, 55, 66, 77, 88]   # 8 seeds (Qwen runs all; Claude anchors at 11/22/33)
@@ -28,15 +28,12 @@ K_LOGREG = [1, 2, 3, 5, 8, 12]
 K_LLM = [1, 3, 5]
 NQ = 30
 POOL = 12   # shots available per class
-FKEYS = ['n_nodes', 'n_edges', 'density', 'n_components', 'mean_degree', 'max_degree',
-         'degree_std', 'max_over_mean_degree', 'avg_clustering', 'transitivity',
-         'degree_assortativity', 'avg_path_length', 'diameter', 'n_cycles', 'n_communities']
+# Canonical feature set = graphlex A-K scalar groups (single source of truth).
+FKEYS = feature_names()
 
 
-def fvec(f):
-    s = f['structure']
-    return [0.0 if (s[k] is None or (isinstance(s[k], float) and s[k] != s[k])) else float(s[k])
-            for k in FKEYS]
+def fvec(f, groups=SCALAR_GROUPS):
+    return feature_vector(f, groups)
 
 
 def gen_family(fam, rng):
