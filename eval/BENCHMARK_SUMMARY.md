@@ -9,7 +9,7 @@
 **One training-free pipeline — verbalize a graph's exact structure with `graphlex`, hand the prose to an LLM, no fitting — is competitive across 30 datasets / 8 sciences, and is the *only* method that runs at 0–1 labels.** Concretely:
 
 - **vs. graph foundation models** (GraphPFN, GMN, KumoRFM): graphlex+LLM is **more flexible** — it never collapses on a domain, while each FM has a science where it falls ~0.10 behind or doesn't run at all.
-- **vs. classical (logreg on the *same* `graphlex.facts()` features):** on *supervised* graph classification it's a **tie** — classical is just as good and just as flexible. We do **not** claim an accuracy win here, and we say so.
+- **vs. classical (logistic regression on the *same* NetworkX features):** on *supervised* graph classification it's a **tie** — classical is just as good and just as flexible. We do **not** claim an accuracy win here, and we say so.
 - **where it actually wins:** the **zero-/low-label regime** (logreg can't train) and **breadth under one interface**. At 0 labels on a prior-rich task it equals logreg trained on ~10 labels/class; at k≤5 labels it's more label-efficient.
 - **the headline is frontier-scoped:** the "never substantially worse" property holds for a frontier model (Opus); smaller open models are competitive-on-average but take occasional real losses.
 
@@ -21,7 +21,7 @@ Skeptic's three favorite questions are answered directly below: *is it memorizat
 
 - **Same everything.** Every method gets the **same graphs, same low-label splits, same budget** (5–12 shots/class, 40 queries, 3 seeds unless noted).
 - **The LLM does no computation.** The "LLM" arm is a fresh Claude subagent doing **pure in-context reasoning** — verified **2 tool uses each** (Read the prompt, Write the answer); zero calculators, zero code.
-- **Apples-to-apples features.** `classical` = logistic regression on the **identical** `graphlex.facts()` vector the LLM sees as prose (structure, plus node-attribute composition where available). FM embeddings (GraphPFN/GMN/KumoRFM) are precomputed on the same real graphs.
+- **Apples-to-apples features.** Both the LLM arm and the baseline read the **same NetworkX structural features** — density, clustering, degree moments, centralities, modularity, etc., computed deterministically by `graphlex.facts()` (graphlex *computes and verbalizes* these standard NetworkX statistics; it does not invent them). They differ only in the **readout**: **`classical`** = logistic regression trained on the feature **vector**; **`graphlex+LLM`** = the *same* features rendered as **prose** and read **zero-shot** by an LLM (no training). FM embeddings (GraphPFN/GMN/KumoRFM) are precomputed on the same real graphs.
 - **Balanced accuracy is primary.** The LLM sees balanced 5/5 shots, so it has **no base-rate signal**; many test sets are imbalanced, where raw accuracy just rewards "predict the majority class." Balanced accuracy (macro-averaged per-class recall; **majority = chance**) is the fair metric. Example: on BZR, raw accuracy makes the LLM look catastrophic (0.375 vs majority 0.842); under balanced accuracy the gap is +0.05.
 
 > Footnote for the record: `classical` here is logreg on the then-current `facts()` vector. The feature set has since been consolidated to the canonical A–K set; baselines will be regenerated (LLM-arm numbers are unaffected). Where a table says "structure-only," graphlex+LLM and classical did **not** use node features while the FMs did — i.e. the FMs had a feature *advantage* in those cells.
@@ -144,17 +144,19 @@ Relational node-label prediction on an SBM org network (`fair_node_hard.py`, de-
 
 ## 6. "Is it just memorization?" — the control that says no
 
-The strongest threat: the LLM recognizes a famous dataset / family and recalls the answer. Test (`synth_multiseed.py`, 5 seeds, 3 model tiers): relabel the structural families **A/B/C per seed** so no "scale-free" prior can fire.
+The strongest threat: the LLM recognizes a famous dataset / family and recalls the answer. Test (`synth_multiseed.py`, 5 seeds, 3 model tiers): relabel the structural families **A/B/C per seed** so no "scale-free" prior can fire. The non-LLM anchor is **classical** (logistic regression on the same NetworkX feature vector) — it doesn't use family names, so anonymization doesn't affect it.
 
-| arm | what it isolates | Haiku 4.5 | Sonnet 4.6 | Opus 4.8 |
+| arm | readout / input | Haiku 4.5 | Sonnet 4.6 | Opus 4.8 |
 |---|---|---|---|---|
-| `raw` | raw edge list, original node order | 0.787 | 0.940 | 0.953 |
-| `raw_perm` | raw edges, **node labels permuted** | 0.387 | 0.620 | 0.553 |
-| `verbal_anon` | verbalized features, **anonymized families** | **0.867** | **0.907** | **0.940** |
+| `raw` | LLM over raw edge list, original node order | 0.787 | 0.940 | 0.953 |
+| `raw_perm` | LLM over raw edges, **node labels permuted** | 0.387 | 0.620 | 0.553 |
+| `verbal_anon` | LLM over verbalized features, **anonymized families** | **0.867** | **0.907** | **0.940** |
+| **classical** | **non-LLM: logreg on the NetworkX feature vector** | 0.920 | 0.920 | 0.920 |
+| *chance* | *—* | *0.333* | *0.333* | *0.333* |
 
-*(logreg reference 0.920.)*
+*(`classical` and `chance` are model-independent — repeated across columns for comparison. ±std: `verbal_anon` ≈ 0.04–0.05, `classical` 0.078.)*
 
-**Two clean results:** (1) **the verbalization win is genuine in-context learning, not memorization** — `verbal_anon` ≈ the named version ≈ logreg, with the prior provably removed. (2) **Raw-edge prompting leans on node-ordering artifacts** — permuting labels drops it 0.32–0.40 (to chance for the small model), while verbalized features are permutation-invariant. *Stating computed structure in language recovers competence that raw edges don't provide.*
+**Two clean results:** (1) **the verbalization win is genuine in-context learning, not memorization** — anonymized `verbal_anon` (0.87–0.94) **matches the non-LLM classical baseline (0.920)**, with the family prior provably removed, and far exceeds chance (0.333). (2) **Raw-edge prompting leans on node-ordering artifacts** — permuting labels drops it 0.32–0.40 (to chance for the small model), while the verbalized arm is permutation-invariant *and* stays level with classical. *Stating computed NetworkX structure in language recovers competence that raw edges don't provide, and does so without recall.*
 
 ---
 
