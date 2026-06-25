@@ -1,20 +1,12 @@
 # Classification task: ensuring the llm is not cheating
 
-**The setup.** We describe a graph using only standard **NetworkX statistics** — density, degree distribution, clustering, communities, cycles, centralities — and ask an LLM to classify it. A skeptic reasonably asks: is the model *reasoning over the structure*, or **cheating** — recognizing a known dataset, or just pattern-matching textbook names like "scale-free"?
+dataset: **10 synthetic graph families** described by the graphlex text + statistics. 
 
-To settle it: **10 synthetic graph families**, freshly sampled, each described only by its verbalized statistics. The model gets **3 labeled examples per class**, then classifies **50 new graphs**. (Families: random/ER, scale-free/BA, small-world/WS, random-regular, geometric, community/SBM, Holme–Kim, grid lattice, caveman, tree.)
+The model gets **3 labeled examples per class**, then classifies **50 new graphs**. (Families: random/ER, scale-free/BA, small-world/WS, random-regular, geometric, community/SBM, Holme–Kim, grid lattice, caveman, tree.)
 
-## Three controls that make cheating impossible
+baseline: logistic regression trained on the *same* feature vector is 100% accurate.
 
-1. **Synthetic + freshly sampled → nothing to recall.** Every graph is generated on the spot; none exists anywhere online. There is no stored answer to look up. *(kills dataset memorization)*
-
-2. **Labels are anonymized (`A`–`J`) and reshuffled every run → the textbook-name shortcut is dead.** The classes are *not* called "scale-free" or "tree" — they're arbitrary letters, randomly reassigned each seed. Knowing "this graph is scale-free" tells you **nothing** about whether the answer is `C` or `F` this run. The only way to learn which letter is which is to read the labeled examples. *(kills name-prior reliance)*
-
-3. **10 classes, not 3 → it can't be "recognizing a few famous names."** Chance is 1/10 = **0.10**. Beating it requires inferring **ten** distinct structure→letter mappings from the examples.
-
-Plus a **non-LLM anchor**: logistic regression trained on the *same* feature vector, marking the achievable ceiling.
-
-## What the model actually sees (verbatim — prose statistics, no raw graph, no names)
+## What the model actually sees
 
 A **labeled example**:
 ```
