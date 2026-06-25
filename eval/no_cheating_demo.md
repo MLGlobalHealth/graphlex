@@ -1,7 +1,6 @@
-# Does the LLM actually *read* graph structure — or is it cheating?
-### A 10-class controlled test (graphlex + LLM)
+# Classification task: ensuring the llm is not cheating
 
-**The setup.** We describe a graph using only standard **NetworkX statistics** — density, degree distribution, clustering, communities, cycles, centralities — rendered as plain text, and ask an LLM to classify it. A skeptic reasonably asks: is the model *reasoning over the structure*, or **cheating** — recognizing a known dataset, or just pattern-matching textbook names like "scale-free"?
+**The setup.** We describe a graph using only standard **NetworkX statistics** — density, degree distribution, clustering, communities, cycles, centralities — and ask an LLM to classify it. A skeptic reasonably asks: is the model *reasoning over the structure*, or **cheating** — recognizing a known dataset, or just pattern-matching textbook names like "scale-free"?
 
 To settle it: **10 synthetic graph families**, freshly sampled, each described only by its verbalized statistics. The model gets **3 labeled examples per class**, then classifies **50 new graphs**. (Families: random/ER, scale-free/BA, small-world/WS, random-regular, geometric, community/SBM, Holme–Kim, grid lattice, caveman, tree.)
 
